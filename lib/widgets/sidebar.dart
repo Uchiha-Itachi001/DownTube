@@ -1,0 +1,306 @@
+import 'package:flutter/material.dart';
+import '../core/app_colors.dart';
+import '../core/app_text_styles.dart';
+
+class Sidebar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onItemSelected;
+  final double width;
+  final bool collapsed;
+
+  const Sidebar({
+    super.key,
+    required this.selectedIndex,
+    required this.onItemSelected,
+    this.width = 210,
+    this.collapsed = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      width: width,
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(AppColors.radius),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppColors.radius),
+        child: Stack(
+          children: [
+            // Subtle green glow at bottom
+            Positioned(
+              bottom: -80,
+              left: -40,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.green.withOpacity(0.08),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Nav content
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: collapsed ? 8 : 12,
+                vertical: 18,
+              ),
+              child: Column(
+                crossAxisAlignment: collapsed
+                    ? CrossAxisAlignment.center
+                    : CrossAxisAlignment.start,
+                children: [
+                  if (!collapsed) ...[
+                    Text('MAIN', style: AppTextStyles.navGroupLabel),
+                    const SizedBox(height: 4),
+                  ] else
+                    const SizedBox(height: 4),
+                  _NavItem(
+                    icon: Icons.dashboard_rounded,
+                    label: 'Dashboard',
+                    isActive: selectedIndex == 0,
+                    onTap: () => onItemSelected(0),
+                    collapsed: collapsed,
+                  ),
+                  _NavItem(
+                    icon: Icons.video_library_rounded,
+                    label: 'Library',
+                    isActive: selectedIndex == 1,
+                    onTap: () => onItemSelected(1),
+                    collapsed: collapsed,
+                  ),
+                  _NavItem(
+                    icon: Icons.download_rounded,
+                    label: 'Downloads',
+                    badge: '3',
+                    isActive: selectedIndex == 2,
+                    onTap: () => onItemSelected(2),
+                    collapsed: collapsed,
+                  ),
+                  _NavItem(
+                    icon: Icons.history_rounded,
+                    label: 'History',
+                    isActive: selectedIndex == 3,
+                    onTap: () => onItemSelected(3),
+                    collapsed: collapsed,
+                  ),
+                  if (!collapsed) ...[
+                    const SizedBox(height: 4),
+                    Text('MORE', style: AppTextStyles.navGroupLabel),
+                    const SizedBox(height: 4),
+                  ] else
+                    const SizedBox(height: 8),
+                  _NavItem(
+                    icon: Icons.settings_rounded,
+                    label: 'Settings',
+                    isActive: selectedIndex == 4,
+                    onTap: () => onItemSelected(4),
+                    collapsed: collapsed,
+                  ),
+                  const Spacer(),
+                  if (!collapsed) _buildStorageBox(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStorageBox() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Storage',
+                  style: AppTextStyles.outfit(
+                      fontSize: 12, fontWeight: FontWeight.w600)),
+              Text('62%',
+                  style: AppTextStyles.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.green)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: SizedBox(
+              height: 3,
+              child: LinearProgressIndicator(
+                value: 0.62,
+                backgroundColor: AppColors.surface3,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.green),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '31.2 GB / 50 GB used',
+              style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final String? badge;
+  final bool isActive;
+  final VoidCallback onTap;
+  final bool collapsed;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    this.badge,
+    required this.isActive,
+    required this.onTap,
+    this.collapsed = false,
+  });
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = widget.isActive;
+    final bg = isActive
+        ? AppColors.greenDim
+        : (_hovered ? AppColors.surface2 : Colors.transparent);
+    final borderColor = isActive
+        ? AppColors.green.withOpacity(0.2)
+        : Colors.transparent;
+    final iconColor = isActive
+        ? AppColors.green
+        : (_hovered ? AppColors.text : AppColors.muted);
+
+    if (widget.collapsed) {
+      // Icon-only mode with tooltip
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Tooltip(
+          message: widget.label,
+          preferBelow: false,
+          waitDuration: const Duration(milliseconds: 300),
+          child: MouseRegion(
+            onEnter: (_) => setState(() => _hovered = true),
+            onExit: (_) => setState(() => _hovered = false),
+            child: GestureDetector(
+              onTap: widget.onTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: bg,
+                  border: Border.all(color: borderColor),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(widget.icon, size: 18, color: iconColor),
+                    if (widget.badge != null)
+                      Positioned(
+                        top: 7,
+                        right: 7,
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: AppColors.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Full label mode
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: BoxDecoration(
+              color: bg,
+              border: Border.all(color: borderColor),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(widget.icon, size: 16, color: iconColor),
+                const SizedBox(width: 10),
+                Text(
+                  widget.label,
+                  style: AppTextStyles.outfit(fontSize: 13, color: iconColor),
+                ),
+                if (widget.badge != null) ...[
+                  const Spacer(),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppColors.green,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      widget.badge!,
+                      style: AppTextStyles.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
