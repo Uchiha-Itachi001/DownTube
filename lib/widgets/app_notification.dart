@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
@@ -66,30 +67,77 @@ class AppNotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      // Outer border — shared around both panels
-      decoration: BoxDecoration(
-        color: const Color(0xFF080C09),
-        border: Border.all(color: _accent.withOpacity(0.35), width: 1),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: _accent.withOpacity(0.12), blurRadius: 24, offset: const Offset(0, 8)),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(11),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── LEFT PANEL — icon badge ──────────────────────────
-              Container(
-                width: 56,
-                color: _accent.withOpacity(0.08),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    type == NotificationType.loading
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          decoration: BoxDecoration(
+            // glass dark surface tinted with accent
+            color: Color.lerp(
+              const Color(0xFF080C09).withOpacity(0.82),
+              _accent,
+              0.04,
+            ),
+            border: Border.all(
+              color: _accent.withOpacity(0.38),
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: _accent.withOpacity(0.22),
+                blurRadius: 32,
+                spreadRadius: -2,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.55),
+                blurRadius: 16,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── GLOWING LEFT BAR ────────────────────────────────
+                Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        _accent.withOpacity(0.2),
+                        _accent,
+                        _accent.withOpacity(0.2),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _accent.withOpacity(0.7),
+                        blurRadius: 10,
+                      ),
+                    ],
+                  ),
+                ),
+                // ── ICON ZONE ────────────────────────────────────────
+                Container(
+                  width: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        _accent.withOpacity(0.10),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: type == NotificationType.loading
                         ? SizedBox(
                             width: 20,
                             height: 20,
@@ -98,57 +146,107 @@ class AppNotificationCard extends StatelessWidget {
                               valueColor: AlwaysStoppedAnimation(_accent),
                             ),
                           )
-                        : Icon(_icon, color: _accent, size: 20),
-                    const SizedBox(height: 4),
-                    Text(
-                      _typeLabel,
-                      style: AppTextStyles.outfit(
-                        fontSize: 8,
-                        fontWeight: FontWeight.w700,
-                        color: _accent,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ],
+                        : Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: _accent.withOpacity(0.14),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _accent.withOpacity(0.35),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _accent.withOpacity(0.3),
+                                  blurRadius: 12,
+                                ),
+                              ],
+                            ),
+                            child: Icon(_icon, color: _accent, size: 18),
+                          ),
+                  ),
                 ),
-              ),
-
-              // ── DIVIDER — the "weld" line between panels ─────────
-              Container(width: 1, color: _accent.withOpacity(0.2)),
-
-              // ── RIGHT PANEL — message + optional action ──────────
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Text(
+                // ── BODY ─────────────────────────────────────────────
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // pill label
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _accent.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: _accent.withOpacity(0.28),
+                            ),
+                          ),
+                          child: Text(
+                            _typeLabel,
+                            style: AppTextStyles.outfit(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: _accent,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
                           message,
                           style: AppTextStyles.outfit(
                             fontSize: 13,
-                            color: AppColors.text.withOpacity(0.85),
-                            height: 1.4,
+                            color: AppColors.text.withOpacity(0.92),
+                            height: 1.45,
                           ),
                         ),
-                      ),
-                      if (actionLabel != null && onAction != null) ...[
-                        const SizedBox(width: 10),
-                        _ActionChip(label: actionLabel!, accent: _accent, onTap: onAction!),
                       ],
-                      if (onDismiss != null) ...[
-                        const SizedBox(width: 8),
+                    ),
+                  ),
+                ),
+                // ── ACTION + CLOSE ────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 10, 10, 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (onDismiss != null)
                         GestureDetector(
                           onTap: onDismiss,
-                          child: Icon(Icons.close_rounded, size: 16, color: AppColors.muted),
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 13,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ),
+                      if (actionLabel != null && onAction != null) ...[
+                        const SizedBox(height: 6),
+                        _ActionChip(
+                          label: actionLabel!,
+                          accent: _accent,
+                          onTap: onAction!,
                         ),
                       ],
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -249,23 +347,26 @@ class _FloatingNotificationState extends State<_FloatingNotification>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _opacity;
-  late Animation<Offset> _slide;
+  late Animation<double> _scale;
+  late Animation<double> _slideY; // 0..1 mapped to vertical offset in build
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 380),
     );
+    // Fade in
     _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
-    _slide = Tween<Offset>(
-      begin: const Offset(0, 0.3),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    // Slight scale from 0.90 → 1.0
+    _scale = Tween<double>(begin: 0.90, end: 1.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
+    // Translate from -16px to 0
+    _slideY = Tween<double>(begin: -16.0, end: 0.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
 
     _ctrl.forward();
-
     Future.delayed(widget.duration, _dismiss);
   }
 
@@ -285,19 +386,27 @@ class _FloatingNotificationState extends State<_FloatingNotification>
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: 32,
+      top: 24,
       left: 0,
       right: 0,
       child: Center(
-        child: FadeTransition(
-          opacity: _opacity,
-          child: SlideTransition(
-            position: _slide,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Material(
+        child: AnimatedBuilder(
+          animation: _ctrl,
+          builder: (_, child) => Opacity(
+            opacity: _opacity.value,
+            child: Transform(
+              alignment: Alignment.topCenter,
+              transform: Matrix4.identity()
+                ..translate(0.0, _slideY.value)
+                ..scale(_scale.value),
+              child: child,
+            ),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Material(
                   color: Colors.transparent,
                   child: AppNotificationCard(
                     type: widget.type,
@@ -312,7 +421,6 @@ class _FloatingNotificationState extends State<_FloatingNotification>
                     onDismiss: _dismiss,
                   ),
                 ),
-              ),
             ),
           ),
         ),

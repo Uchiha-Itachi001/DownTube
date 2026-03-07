@@ -45,7 +45,20 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: LayoutBuilder(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.0, -0.9),
+            radius: 1.4,
+            colors: [
+              Color(0xFF0D1F10), // faint dark-green at top
+              Color(0xFF080B08), // near-black mid
+              Color(0xFF060809), // deep base
+            ],
+            stops: [0.0, 0.45, 1.0],
+          ),
+        ),
+        child: LayoutBuilder(
         builder: (context, constraints) {
           final w = constraints.maxWidth;
           // Responsive sidebar: collapsed icon-only <800, narrow 800-1099, full >=1100
@@ -78,7 +91,7 @@ class _AppShellState extends State<AppShell> {
                   child: Row(
                     children: [
                       Sidebar(
-                        selectedIndex: _selectedIndex > 4 ? 0 : _selectedIndex,
+                        selectedIndex: _selectedIndex > 4 ? -1 : _selectedIndex,
                         onItemSelected: _onNavSelected,
                         width: sidebarWidth,
                         collapsed: collapsed,
@@ -100,6 +113,7 @@ class _AppShellState extends State<AppShell> {
             ),
           );
         },
+      ),
       ),
     );
   }

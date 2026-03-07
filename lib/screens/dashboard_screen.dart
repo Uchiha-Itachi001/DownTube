@@ -180,8 +180,8 @@ class DashboardScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
       decoration: BoxDecoration(
-        color: AppColors.surface2.withOpacity(0.7),
-        border: Border.all(color: AppColors.border),
+        color: Colors.transparent,
+        border: Border.all(color: AppColors.green.withOpacity(0.30)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -391,7 +391,7 @@ class _GridPainter extends CustomPainter {
     const gridSize = 60.0;
     final offset = t * gridSize;
     final paint = Paint()
-      ..color = const Color(0xFF22C55E).withOpacity(0.04)
+      ..color = const Color(0xFF22C55E).withOpacity(0.10)
       ..strokeWidth = 1;
 
     for (double x = -gridSize + offset; x < size.width + gridSize; x += gridSize) {
@@ -792,7 +792,7 @@ class _DataStreamsState extends State<_DataStreams>
   @override
   void initState() {
     super.initState();
-    _streams = List.generate(6, (_) => _StreamData(_rng));
+    _streams = List.generate(18, (_) => _StreamData(_rng));
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
@@ -833,11 +833,11 @@ class _StreamData {
   }
 
   void _reset({bool fromTop = true}) {
-    x = 0.1 + rng.nextDouble() * 0.8;
+    x = 0.05 + rng.nextDouble() * 0.9;
     y = fromTop ? -0.5 : (-0.5 + rng.nextDouble() * 2.0);
-    speed = 0.001 + rng.nextDouble() * 0.002;
-    height = 0.08 + rng.nextDouble() * 0.2;
-    opacity = 0.3 + rng.nextDouble() * 0.4;
+    speed = 0.003 + rng.nextDouble() * 0.005;
+    height = 0.10 + rng.nextDouble() * 0.25;
+    opacity = 0.45 + rng.nextDouble() * 0.45;
   }
 
   void update() {

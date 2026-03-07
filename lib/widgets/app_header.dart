@@ -1,9 +1,43 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
+import 'app_notification.dart';
 
-class AppHeader extends StatelessWidget {
+class AppHeader extends StatefulWidget {
   const AppHeader({super.key});
+
+  @override
+  State<AppHeader> createState() => _AppHeaderState();
+}
+
+class _AppHeaderState extends State<AppHeader> {
+  bool _notifRunning = false;
+
+  /// Shows each notification type, one at a time, 1.2 s apart.
+  Future<void> _runNotifDemo() async {
+    if (_notifRunning) return;
+    _notifRunning = true;
+
+    final items = [
+      (NotificationType.success, 'Download completed — video saved to library!'),
+      (NotificationType.info,    'New version of yt-dlp available (v2026.04.01)'),
+      (NotificationType.error,   'Failed to fetch URL — check your internet connection.'),
+      (NotificationType.loading, 'Fetching video metadata, please wait…'),
+    ];
+
+    for (final item in items) {
+      if (!mounted) break;
+      showAppNotification(
+        context,
+        type: item.$1,
+        message: item.$2,
+        duration: const Duration(seconds: 3),
+      );
+      await Future.delayed(const Duration(milliseconds: 1200));
+    }
+
+    _notifRunning = false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +53,9 @@ class AppHeader extends StatelessWidget {
         children: [
           _buildEnginePill(),
           const Spacer(),
-          _buildIconButton(Icons.refresh_rounded),
+          _buildIconButton(Icons.refresh_rounded, null),
           const SizedBox(width: 8),
-          _buildIconButton(Icons.notifications_outlined),
+          _buildIconButton(Icons.notifications_outlined, _runNotifDemo),
           const SizedBox(width: 8),
           _buildUserPill(),
         ],
@@ -68,8 +102,9 @@ class AppHeader extends StatelessWidget {
     );
   }
 
-  Widget _buildIconButton(IconData icon) {
+  Widget _buildIconButton(IconData icon, VoidCallback? onTap) {
     return _HoverContainer(
+      onTap: onTap,
       child: Container(
         width: 34,
         height: 34,
@@ -198,7 +233,8 @@ class _PulsingDotState extends State<_PulsingDot>
 
 class _HoverContainer extends StatefulWidget {
   final Widget child;
-  const _HoverContainer({required this.child});
+  final VoidCallback? onTap;
+  const _HoverContainer({required this.child, this.onTap});
 
   @override
   State<_HoverContainer> createState() => _HoverContainerState();
@@ -213,10 +249,13 @@ class _HoverContainerState extends State<_HoverContainer> {
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedOpacity(
-        duration: const Duration(milliseconds: 200),
-        opacity: _hovered ? 1.0 : 0.7,
-        child: widget.child,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          opacity: _hovered ? 1.0 : 0.7,
+          child: widget.child,
+        ),
       ),
     );
   }

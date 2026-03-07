@@ -3,7 +3,7 @@ import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import 'app_notification.dart';
 
-class UrlInputBar extends StatelessWidget {
+class UrlInputBar extends StatefulWidget {
   final String placeholder;
   final VoidCallback? onAnalyze;
   final VoidCallback? onPaste;
@@ -23,52 +23,103 @@ class UrlInputBar extends StatelessWidget {
   });
 
   @override
+  State<UrlInputBar> createState() => _UrlInputBarState();
+}
+
+class _UrlInputBarState extends State<UrlInputBar> {
+  final FocusNode _focusNode = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      setState(() => _focused = _focusNode.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: EdgeInsets.fromLTRB(16, compact ? 4 : 6, compact ? 4 : 6, compact ? 4 : 6),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: EdgeInsets.fromLTRB(16, widget.compact ? 4 : 6, widget.compact ? 4 : 6, widget.compact ? 4 : 6),
           decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.green.withOpacity(0.5)),
+            color: _focused
+                ? const Color(0xFF0A110A).withOpacity(0.75)
+                : const Color(0xFF080C09).withOpacity(0.55),
+            border: Border.all(
+              color: _focused
+                  ? AppColors.green.withOpacity(0.85)
+                  : AppColors.green.withOpacity(0.3),
+              width: _focused ? 1.5 : 1.0,
+            ),
             borderRadius: BorderRadius.circular(14),
+            boxShadow: _focused
+                ? [
+                    BoxShadow(
+                      color: AppColors.green.withOpacity(0.18),
+                      blurRadius: 22,
+                      spreadRadius: 2,
+                    ),
+                    BoxShadow(
+                      color: AppColors.green.withOpacity(0.08),
+                      blurRadius: 40,
+                      spreadRadius: 5,
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: AppColors.green.withOpacity(0.06),
+                      blurRadius: 12,
+                    ),
+                  ],
           ),
           child: Row(
             children: [
-              const Icon(Icons.link, size: 16, color: AppColors.muted),
+              Icon(Icons.link, size: 16,
+                  color: _focused ? AppColors.green.withOpacity(0.7) : AppColors.muted),
               const SizedBox(width: 10),
               Expanded(
                 child: TextField(
-                  style: AppTextStyles.outfit(fontSize: compact ? 12 : 13.5),
+                  focusNode: _focusNode,
+                  style: AppTextStyles.outfit(fontSize: widget.compact ? 12 : 13.5),
                   decoration: InputDecoration(
-                    hintText: placeholder,
+                    hintText: widget.placeholder,
                     hintStyle: AppTextStyles.outfit(
-                        fontSize: compact ? 12 : 13.5, color: AppColors.muted),
+                        fontSize: widget.compact ? 12 : 13.5, color: AppColors.muted),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
               ),
-              if (!compact) ...[
-                _PasteButton(onTap: onPaste),
+              if (!widget.compact) ...[
+                _PasteButton(onTap: widget.onPaste),
                 const SizedBox(width: 6),
               ],
               _AnalyzeButton(
-                onTap: onAnalyze,
-                compact: compact,
+                onTap: widget.onAnalyze,
+                compact: widget.compact,
               ),
             ],
           ),
         ),
         // ── Inline fused status card ──────────────────────────────
-        if (statusMessage != null && statusMessage!.isNotEmpty) ...[
+        if (widget.statusMessage != null && widget.statusMessage!.isNotEmpty) ...[
           const SizedBox(height: 10),
           AppNotificationCard(
-            type: statusType,
-            message: statusMessage!,
+            type: widget.statusType,
+            message: widget.statusMessage!,
           ),
         ],
       ],
