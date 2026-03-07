@@ -5,7 +5,7 @@ class AppColors {
 
   // Backgrounds
   static const Color bg = Color(0xFF0B0B0D);
-  static const Color surface1 = Color(0xFF111114);
+  static const Color surface1 = Color(0xFF080C09);
   static const Color surface2 = Color(0xFF17171B);
   static const Color surface3 = Color(0xFF1E1E24);
 

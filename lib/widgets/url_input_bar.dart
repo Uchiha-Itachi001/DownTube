@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
+import 'app_notification.dart';
 
 class UrlInputBar extends StatelessWidget {
   final String placeholder;
   final VoidCallback? onAnalyze;
   final VoidCallback? onPaste;
   final bool compact;
+  /// Optional inline status shown below the bar (error / success / fetching)
+  final String? statusMessage;
+  final NotificationType statusType;
 
   const UrlInputBar({
     super.key,
@@ -14,44 +18,60 @@ class UrlInputBar extends StatelessWidget {
     this.onAnalyze,
     this.onPaste,
     this.compact = false,
+    this.statusMessage,
+    this.statusType = NotificationType.info,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, compact ? 4 : 6, compact ? 4 : 6, compact ? 4 : 6),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.link, size: 16, color: AppColors.muted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              style: AppTextStyles.outfit(fontSize: compact ? 12 : 13.5),
-              decoration: InputDecoration(
-                hintText: placeholder,
-                hintStyle: AppTextStyles.outfit(
-                    fontSize: compact ? 12 : 13.5, color: AppColors.muted),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: EdgeInsets.fromLTRB(16, compact ? 4 : 6, compact ? 4 : 6, compact ? 4 : 6),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            border: Border.all(color: AppColors.green.withOpacity(0.5)),
+            borderRadius: BorderRadius.circular(14),
           ),
-          if (!compact) ...[
-            _PasteButton(onTap: onPaste),
-            const SizedBox(width: 6),
-          ],
-          _AnalyzeButton(
-            onTap: onAnalyze,
-            compact: compact,
+          child: Row(
+            children: [
+              const Icon(Icons.link, size: 16, color: AppColors.muted),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  style: AppTextStyles.outfit(fontSize: compact ? 12 : 13.5),
+                  decoration: InputDecoration(
+                    hintText: placeholder,
+                    hintStyle: AppTextStyles.outfit(
+                        fontSize: compact ? 12 : 13.5, color: AppColors.muted),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              if (!compact) ...[
+                _PasteButton(onTap: onPaste),
+                const SizedBox(width: 6),
+              ],
+              _AnalyzeButton(
+                onTap: onAnalyze,
+                compact: compact,
+              ),
+            ],
+          ),
+        ),
+        // ── Inline fused status card ──────────────────────────────
+        if (statusMessage != null && statusMessage!.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          AppNotificationCard(
+            type: statusType,
+            message: statusMessage!,
           ),
         ],
-      ),
+      ],
     );
   }
 }

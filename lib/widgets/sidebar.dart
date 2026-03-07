@@ -24,7 +24,7 @@ class Sidebar extends StatelessWidget {
       width: width,
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.green.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: ClipRRect(

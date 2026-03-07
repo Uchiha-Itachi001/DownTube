@@ -48,7 +48,7 @@ class _LibraryCardState extends State<LibraryCard> {
           border: Border.all(
             color: _hovered
                 ? accentColor.withOpacity(0.4)
-                : AppColors.border,
+                : AppColors.green.withOpacity(0.2),
           ),
           borderRadius: BorderRadius.circular(14),
           boxShadow: _hovered
