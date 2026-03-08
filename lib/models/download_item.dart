@@ -2,6 +2,9 @@ import 'package:uuid/uuid.dart';
 
 enum DownloadStatus { queued, downloading, done, error, paused }
 
+/// Which phase of a multi-stream yt-dlp download we are in.
+enum DownloadPhase { video, audio, merging, complete }
+
 class DownloadItem {
   final String id;
   final String title;
@@ -10,12 +13,28 @@ class DownloadItem {
   final String format;
   final String outputPath;
   final DateTime createdAt;
+  /// 0 = first download; N > 0 appends " (N)" to the output filename.
+  final int downloadIndex;
   DownloadStatus status;
+  DownloadPhase phase;
   double progress;
   String? speed;
   String? eta;
   String? errorMessage;
   String? thumbnailUrl;
+  String? extractor; // platform: youtube, instagram, tiktok …
+  /// Rolling window of speed samples (KB/s) used for the sparkline chart.
+  final List<double> speedHistory;
+  /// When false the item is hidden from the History screen but stays in Library.
+  bool showInHistory;
+  /// When false the item is hidden from the Library screen.
+  bool showInLibrary;
+  /// The absolute path of the output file on disk (set when download completes).
+  String filePath;
+  /// Actual total file size parsed from yt-dlp output (e.g. "383.84 MiB").
+  String? fileSize;
+  /// Video duration in seconds from VideoInfo (set at enqueue time).
+  int? videoDuration;
 
   DownloadItem({
     String? id,
@@ -25,11 +44,77 @@ class DownloadItem {
     required this.format,
     required this.outputPath,
     this.status = DownloadStatus.queued,
+    this.phase = DownloadPhase.video,
     this.progress = 0.0,
     this.speed,
     this.eta,
     this.errorMessage,
     this.thumbnailUrl,
+    this.extractor,
+    this.downloadIndex = 0,
+    this.showInHistory = true,
+    this.showInLibrary = true,
+    this.filePath = '',
+    this.fileSize,
+    this.videoDuration,
+    DateTime? createdAt,
+    List<double>? speedHistory,
   })  : id = id ?? const Uuid().v4(),
-        createdAt = DateTime.now();
+        createdAt = createdAt ?? DateTime.now(),
+        speedHistory = speedHistory ?? [];
+
+  /// Formats [videoDuration] (seconds) as MM:SS or HH:MM:SS.
+  String get formattedDuration {
+    final d = videoDuration;
+    if (d == null) return '—';
+    final h = d ~/ 3600;
+    final m = (d % 3600) ~/ 60;
+    final s = d % 60;
+    if (h > 0) {
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  // ── Database serialisation ────────────────────────────────────────────────
+
+  Map<String, dynamic> toDbMap() => {
+        'id': id,
+        'title': title,
+        'url': url,
+        'output_path': outputPath,
+        'resolution': resolution,
+        'format': format,
+        'thumbnail_url': thumbnailUrl,
+        'extractor': extractor,
+        'status': status.name,
+        'created_at': createdAt.millisecondsSinceEpoch,
+        'download_index': downloadIndex,
+        'show_in_history': showInHistory ? 1 : 0,
+        'show_in_library': showInLibrary ? 1 : 0,
+        'file_path': filePath,
+        'file_size': fileSize,
+        'video_duration': videoDuration,
+      };
+
+  factory DownloadItem.fromDbMap(Map<String, dynamic> row) => DownloadItem(
+        id: row['id'] as String,
+        title: row['title'] as String? ?? '',
+        url: row['url'] as String? ?? '',
+        resolution: row['resolution'] as String? ?? '',
+        format: row['format'] as String? ?? '',
+        outputPath: row['output_path'] as String? ?? '',
+        thumbnailUrl: row['thumbnail_url'] as String?,
+        extractor: row['extractor'] as String?,
+        status: DownloadStatus.done,
+        phase: DownloadPhase.complete,
+        downloadIndex: (row['download_index'] as int?) ?? 0,
+        showInHistory: ((row['show_in_history'] as int?) ?? 1) != 0,
+        showInLibrary: ((row['show_in_library'] as int?) ?? 1) != 0,
+        filePath: row['file_path'] as String? ?? '',
+        fileSize: row['file_size'] as String?,
+        videoDuration: row['video_duration'] as int?,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(
+            (row['created_at'] as int?) ?? DateTime.now().millisecondsSinceEpoch),
+      );
 }

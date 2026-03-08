@@ -15,16 +15,27 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ringCtrl;
+    with TickerProviderStateMixin {
+  late AnimationController _spinCtrl;
+  late AnimationController _pulseCtrl;
+  late AnimationController _glowCtrl;
   late StartupController _startup;
 
   @override
   void initState() {
     super.initState();
-    _ringCtrl =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))
-          ..repeat();
+    _spinCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat();
+    _glowCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
 
     _startup = StartupController();
     _startup.addListener(_onStartupChange);
@@ -53,10 +64,25 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    _ringCtrl.dispose();
+    _spinCtrl.dispose();
+    _pulseCtrl.dispose();
+    _glowCtrl.dispose();
     _startup.removeListener(_onStartupChange);
     _startup.dispose();
     super.dispose();
+  }
+
+  double get _progressValue {
+    switch (_startup.stage) {
+      case StartupStage.checking:
+        return 0.40;
+      case StartupStage.ytDlpMissing:
+        return 0.45;
+      case StartupStage.locationNeeded:
+        return 0.72;
+      case StartupStage.ready:
+        return 1.0;
+    }
   }
 
   @override
@@ -66,88 +92,69 @@ class _SplashScreenState extends State<SplashScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // ── Background glow ──────────────────────────────────────────────
-          Center(
-            child: Container(
-              width: 320,
-              height: 320,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.green.withOpacity(0.07),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
+          // ── Background grid ──────────────────────────────────────────────
+          const CustomPaint(
+            size: Size.infinite,
+            painter: _BgGridPainter(),
           ),
 
-          // ── Center logo + ring ───────────────────────────────────────────
+          // ── Center content ───────────────────────────────────────────────
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Ring + logo
+                // Pulse rings + logo
                 SizedBox(
-                  width: 90,
-                  height: 90,
+                  width: 220,
+                  height: 220,
                   child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      // Animated ring
-                      AnimatedBuilder(
-                        animation: _ringCtrl,
-                        builder: (_, __) => CustomPaint(
-                          size: const Size(90, 90),
-                          painter: _RingPainter(_ringCtrl.value),
+                      // 3 expanding pulse rings
+                      ...[0.0, 0.34, 0.67].map((offset) =>
+                        AnimatedBuilder(
+                          animation: _pulseCtrl,
+                          builder: (_, __) {
+                            final t = (_pulseCtrl.value + offset) % 1.0;
+                            return CustomPaint(
+                              size: const Size(220, 220),
+                              painter: _PulseRingPainter(t),
+                            );
+                          },
                         ),
                       ),
-                      // Center icon
-                      Center(
-                        child: Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: AppColors.green,
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: AppColors.greenGlow.withOpacity(0.6),
-                                  blurRadius: 24),
-                            ],
-                          ),
-                          child: const Icon(Icons.check_rounded,
-                              color: Colors.black, size: 26),
-                        ),
-                      ),
+                      // Logo
+                      _buildLogo(),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 32),
 
                 Text(
                   'DownTube',
                   style: AppTextStyles.syne(
-                      fontSize: 22, fontWeight: FontWeight.w800),
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                const SizedBox(height: 8),
-
-                // Status message
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: Text(
-                    _startup.statusMessage,
-                    key: ValueKey(_startup.statusMessage),
-                    style: AppTextStyles.outfit(
-                        fontSize: 13, color: AppColors.muted),
+                const SizedBox(height: 6),
+                Text(
+                  'Video Download Engine',
+                  style: AppTextStyles.outfit(
+                    fontSize: 12,
+                    color: AppColors.muted,
+                    letterSpacing: 0.5,
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 32),
 
-                // Status indicator dot
-                _StatusDot(stage: _startup.stage),
+                _buildProgressBar(),
+
+                const SizedBox(height: 16),
+
+                _buildStatusRow(),
               ],
             ),
           ),
@@ -167,30 +174,216 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
   }
+
+  Widget _buildLogo() {
+    return SizedBox(
+      width: 100,
+      height: 100,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Spinning arc
+          AnimatedBuilder(
+            animation: _spinCtrl,
+            builder: (_, __) => CustomPaint(
+              size: const Size(100, 100),
+              painter: _ArcPainter(_spinCtrl.value),
+            ),
+          ),
+          // Breathing glow
+          AnimatedBuilder(
+            animation: _glowCtrl,
+            builder: (_, __) => Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.green.withOpacity(
+                      0.08 + _glowCtrl.value * 0.22,
+                    ),
+                    blurRadius: 24 + _glowCtrl.value * 20,
+                    spreadRadius: 2 + _glowCtrl.value * 6,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // DT circle
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.bg,
+              border: Border.all(
+                color: AppColors.green.withOpacity(0.55),
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                'DT',
+                style: AppTextStyles.syne(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.green,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressBar() {
+    return SizedBox(
+      width: 220,
+      height: 2,
+      child: Stack(
+        children: [
+          Container(
+            height: 2,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOutCubic,
+            width: 220 * _progressValue,
+            height: 2,
+            decoration: BoxDecoration(
+              color: AppColors.green,
+              borderRadius: BorderRadius.circular(2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.green.withOpacity(0.5),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusRow() {
+    final isDone = _startup.stage == StartupStage.ready;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: Row(
+        key: ValueKey(_startup.statusMessage),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isDone)
+            const Icon(Icons.check_circle_rounded,
+                size: 14, color: AppColors.green)
+          else
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: AppColors.green,
+              ),
+            ),
+          const SizedBox(width: 8),
+          Text(
+            _startup.statusMessage,
+            style: AppTextStyles.outfit(
+              fontSize: 12,
+              color: AppColors.muted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// ── Ring painter ──────────────────────────────────────────────────────────────
+// ── Background grid painter ───────────────────────────────────────────────────
 
-class _RingPainter extends CustomPainter {
+class _BgGridPainter extends CustomPainter {
+  const _BgGridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const spacing = 40.0;
+    final linePaint = Paint()
+      ..color = AppColors.green.withOpacity(0.035)
+      ..strokeWidth = 0.5;
+    final dotPaint = Paint()
+      ..color = AppColors.green.withOpacity(0.10);
+
+    for (double x = 0; x <= size.width; x += spacing) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
+    }
+    for (double y = 0; y <= size.height; y += spacing) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), linePaint);
+    }
+    for (double x = 0; x <= size.width; x += spacing) {
+      for (double y = 0; y <= size.height; y += spacing) {
+        canvas.drawCircle(Offset(x, y), 1.2, dotPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BgGridPainter old) => false;
+}
+
+// ── Pulse ring painter ────────────────────────────────────────────────────────
+
+class _PulseRingPainter extends CustomPainter {
+  final double t;
+  _PulseRingPainter(this.t);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    const minR = 56.0;
+    const maxR = 92.0;
+    final radius = minR + (maxR - minR) * t;
+    final opacity = (1.0 - t) * 0.35;
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = AppColors.green.withOpacity(opacity),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PulseRingPainter old) => old.t != t;
+}
+
+// ── Arc painter ───────────────────────────────────────────────────────────────
+
+class _ArcPainter extends CustomPainter {
   final double value;
-  _RingPainter(this.value);
+  _ArcPainter(this.value);
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 4;
 
-    // Background ring
     canvas.drawCircle(
       center,
       radius,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
-        ..color = AppColors.green.withOpacity(0.15),
+        ..strokeWidth = 2
+        ..color = AppColors.green.withOpacity(0.12),
     );
 
-    // Sweeping arc
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       -math.pi / 2 + value * 2 * math.pi,
@@ -198,14 +391,14 @@ class _RingPainter extends CustomPainter {
       false,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3
+        ..strokeWidth = 2.5
         ..strokeCap = StrokeCap.round
         ..color = AppColors.green,
     );
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) => old.value != value;
+  bool shouldRepaint(_ArcPainter old) => old.value != value;
 }
 
 // ── Status dot ────────────────────────────────────────────────────────────────

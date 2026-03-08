@@ -32,6 +32,10 @@ class StartupController extends ChangeNotifier {
       return;
     }
 
+    statusMessage = 'Loading download history…';
+    notifyListeners();
+    await Future.delayed(const Duration(milliseconds: 200));
+
     statusMessage = 'Checking download location…';
     notifyListeners();
     await Future.delayed(const Duration(milliseconds: 300));

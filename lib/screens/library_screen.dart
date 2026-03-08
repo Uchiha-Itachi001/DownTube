@@ -30,7 +30,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       listenable: AppState.instance,
       builder: (context, _) {
         final completed = AppState.instance.downloads
-            .where((d) => d.status == DownloadStatus.done)
+            .where((d) => d.status == DownloadStatus.done && d.showInLibrary)
             .toList();
 
         List<DownloadItem> filtered;
@@ -237,8 +237,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Widget _buildGrid(List<DownloadItem> items) {
     return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 220,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
         mainAxisSpacing: AppColors.gap,
         crossAxisSpacing: AppColors.gap,
         childAspectRatio: 0.78,
@@ -250,10 +250,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
         return LibraryCard(
           title: item.title,
           meta: '${item.resolution} · ${item.format}',
-          duration: '—',
-          size: item.format,
+          duration: item.formattedDuration,
+          size: item.fileSize ?? '—',
           isAudio: isAudio,
           thumbnailUrl: item.thumbnailUrl,
+          outputPath: item.filePath.isNotEmpty ? item.filePath : item.outputPath,
         );
       },
     );

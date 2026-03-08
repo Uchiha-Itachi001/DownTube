@@ -179,21 +179,21 @@ class VideoInfo {
     double mbps;
     switch (resolution) {
       case '4K':
-        mbps = 12.5;
+        mbps = 8.0;   // VP9/AV1 4K
       case '1440p':
-        mbps = 6.0;
+        mbps = 4.0;
       case '1080p':
-        mbps = 3.5;
+        mbps = 1.5;   // VP9/AV1 1080p (was 3.5 AVC)
       case '720p':
-        mbps = 1.5;
+        mbps = 0.8;
       case '480p':
-        mbps = 0.75;
-      case '360p':
         mbps = 0.4;
+      case '360p':
+        mbps = 0.2;
       case '240p':
-        mbps = 0.22;
+        mbps = 0.12;
       case '144p':
-        mbps = 0.10;
+        mbps = 0.06;
       case '320k':
         mbps = 320.0 / 1000;
       case '192k':

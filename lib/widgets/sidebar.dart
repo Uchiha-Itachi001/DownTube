@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
+import '../models/download_item.dart';
+import '../providers/app_state.dart';
 
 class Sidebar extends StatelessWidget {
   final int selectedIndex;
@@ -92,13 +94,23 @@ class Sidebar extends StatelessWidget {
                     onTap: () => onItemSelected(1),
                     collapsed: collapsed,
                   ),
-                  _NavItem(
-                    icon: Icons.download_rounded,
-                    label: 'Downloads',
-                    badge: '3',
-                    isActive: selectedIndex == 2,
-                    onTap: () => onItemSelected(2),
-                    collapsed: collapsed,
+                  ListenableBuilder(
+                    listenable: AppState.instance,
+                    builder: (_, __) {
+                      final n = AppState.instance.downloads
+                          .where((d) =>
+                              d.status == DownloadStatus.downloading ||
+                              d.status == DownloadStatus.queued)
+                          .length;
+                      return _NavItem(
+                        icon: Icons.download_rounded,
+                        label: 'Downloads',
+                        badge: n > 0 ? '$n' : null,
+                        isActive: selectedIndex == 2,
+                        onTap: () => onItemSelected(2),
+                        collapsed: collapsed,
+                      );
+                    },
                   ),
                   _NavItem(
                     icon: Icons.history_rounded,

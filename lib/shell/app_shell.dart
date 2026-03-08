@@ -17,9 +17,13 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   String? _pendingUrl;
+  int _fetchKey = 0; // incremented on every new search to force widget rebuild
+  int _screenRefreshKey = 0; // incremented to force screen refresh
+  bool _isRefreshing = false;
+  late AnimationController _refreshSpinCtrl;
 
   void _onNavSelected(int index) => setState(() => _selectedIndex = index);
 
@@ -28,7 +32,39 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _pendingUrl = url;
       _selectedIndex = 5;
+      _fetchKey++;
     });
+  }
+
+  Future<void> _onRefresh() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    _refreshSpinCtrl.repeat();
+    // Reload AppState data from DB
+    await AppState.instance.refreshFromDb();
+    await Future.delayed(const Duration(milliseconds: 600));
+    setState(() {
+      _screenRefreshKey++;
+      _isRefreshing = false;
+    });
+    _refreshSpinCtrl
+      ..stop()
+      ..reset();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshSpinCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshSpinCtrl.dispose();
+    super.dispose();
   }
 
   Widget _buildNonAnalyzeScreen() {
@@ -88,7 +124,13 @@ class _AppShellState extends State<AppShell> {
                       ),
                       const SizedBox(width: AppColors.gap),
                       // Header controls — takes all remaining space, never overflows
-                      const Expanded(child: AppHeader()),
+                      Expanded(
+                        child: AppHeader(
+                          isRefreshing: _isRefreshing,
+                          refreshSpinCtrl: _refreshSpinCtrl,
+                          onRefresh: _onRefresh,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -110,14 +152,26 @@ class _AppShellState extends State<AppShell> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            // Screens 0–4: swapped via AnimatedSwitcher
+                            // Screens 0–4: swapped via AnimatedSwitcher with slide
                             Offstage(
                               offstage: _selectedIndex == 5,
                               child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
+                                duration: const Duration(milliseconds: 280),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                transitionBuilder: (child, animation) {
+                                  final slide = Tween<Offset>(
+                                    begin: const Offset(0.04, 0),
+                                    end: Offset.zero,
+                                  ).animate(animation);
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: SlideTransition(position: slide, child: child),
+                                  );
+                                },
                                 child: KeyedSubtree(
                                   key: ValueKey(
-                                      _selectedIndex < 5 ? _selectedIndex : 0),
+                                      '${_selectedIndex < 5 ? _selectedIndex : 0}-$_screenRefreshKey'),
                                   child: _buildNonAnalyzeScreen(),
                                 ),
                               ),
@@ -127,9 +181,47 @@ class _AppShellState extends State<AppShell> {
                               Offstage(
                                 offstage: _selectedIndex != 5,
                                 child: AnalyzedScreen(
-                                  key: ValueKey(_pendingUrl),
+                                  key: ValueKey('$_pendingUrl-$_fetchKey'),
                                   initialUrl: _pendingUrl,
                                   onDownload: () => _onNavSelected(2),
+                                ),
+                              ),
+                            // ── Refresh overlay ──────────────────────────────
+                            if (_isRefreshing)
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: AnimatedOpacity(
+                                    opacity: _isRefreshing ? 1.0 : 0.0,
+                                    duration: const Duration(milliseconds: 200),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: AppColors.bg.withOpacity(0.72),
+                                        borderRadius: BorderRadius.circular(AppColors.radius),
+                                      ),
+                                      child: Center(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SizedBox(
+                                              width: 48,
+                                              height: 48,
+                                              child: _GlowSpinner(controller: _refreshSpinCtrl),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            Text(
+                                              'Refreshing...',
+                                              style: const TextStyle(
+                                                fontFamily: 'Outfit',
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.green,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
                           ],
@@ -233,4 +325,61 @@ class _LogoBox extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Cool glowing spinner for refresh overlay ─────────────────────────────────
+
+class _GlowSpinner extends StatelessWidget {
+  final AnimationController controller;
+  const _GlowSpinner({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (_, __) {
+        return Transform.rotate(
+          angle: controller.value * 2 * 3.14159265,
+          child: CustomPaint(
+            painter: _GlowArcPainter(progress: controller.value),
+            size: const Size(48, 48),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _GlowArcPainter extends CustomPainter {
+  final double progress;
+  const _GlowArcPainter({required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const color = AppColors.green;
+    final rect = Rect.fromLTWH(4, 4, size.width - 8, size.height - 8);
+
+    // Glow ring
+    final glowPaint = Paint()
+      ..color = color.withOpacity(0.25)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawArc(rect, 0, 3.14159 * 1.7, false, glowPaint);
+
+    // Main arc
+    final arcPaint = Paint()
+      ..shader = SweepGradient(
+        colors: [color.withOpacity(0.1), color],
+        startAngle: 0,
+        endAngle: 3.14159 * 1.7,
+      ).createShader(rect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, 0, 3.14159 * 1.7, false, arcPaint);
+  }
+
+  @override
+  bool shouldRepaint(_GlowArcPainter old) => old.progress != progress;
 }
