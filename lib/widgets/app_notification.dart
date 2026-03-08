@@ -318,9 +318,11 @@ void showAppNotification(
   String? actionLabel,
   VoidCallback? onAction,
   Duration duration = const Duration(seconds: 4),
+  ValueNotifier<bool>? dismissController,
 }) {
   final overlay = Overlay.of(context);
   late OverlayEntry entry;
+  bool _removed = false;
 
   entry = OverlayEntry(
     builder: (_) => _FloatingNotification(
@@ -329,8 +331,14 @@ void showAppNotification(
       subtitle: subtitle,
       actionLabel: actionLabel,
       onAction: onAction,
-      onDismiss: () => entry.remove(),
+      onDismiss: () {
+        if (!_removed) {
+          _removed = true;
+          entry.remove();
+        }
+      },
       duration: duration,
+      dismissController: dismissController,
     ),
   );
 
@@ -345,6 +353,7 @@ class _FloatingNotification extends StatefulWidget {
   final VoidCallback? onAction;
   final VoidCallback onDismiss;
   final Duration duration;
+  final ValueNotifier<bool>? dismissController;
 
   const _FloatingNotification({
     required this.type,
@@ -354,6 +363,7 @@ class _FloatingNotification extends StatefulWidget {
     this.onAction,
     required this.onDismiss,
     required this.duration,
+    this.dismissController,
   });
 
   @override
@@ -365,7 +375,8 @@ class _FloatingNotificationState extends State<_FloatingNotification>
   late AnimationController _ctrl;
   late Animation<double> _opacity;
   late Animation<double> _scale;
-  late Animation<double> _slideY; // 0..1 mapped to vertical offset in build
+  late Animation<double> _slideY;
+  bool _dismissed = false;
 
   @override
   void initState() {
@@ -384,11 +395,17 @@ class _FloatingNotificationState extends State<_FloatingNotification>
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
 
     _ctrl.forward();
+    widget.dismissController?.addListener(_onDismissController);
     Future.delayed(widget.duration, _dismiss);
   }
 
+  void _onDismissController() {
+    if (widget.dismissController?.value == true) _dismiss();
+  }
+
   void _dismiss() {
-    if (!mounted) return;
+    if (!mounted || _dismissed) return;
+    _dismissed = true;
     _ctrl.reverse().then((_) {
       if (mounted) widget.onDismiss();
     });
@@ -396,6 +413,7 @@ class _FloatingNotificationState extends State<_FloatingNotification>
 
   @override
   void dispose() {
+    widget.dismissController?.removeListener(_onDismissController);
     _ctrl.dispose();
     super.dispose();
   }

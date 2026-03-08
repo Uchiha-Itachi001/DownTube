@@ -51,6 +51,9 @@ class VideoInfo {
   final String? webpageUrl;
   final List<FormatInfo> formats;
   final String? extractor;
+  /// Height of the best format yt-dlp selected (top-level JSON field).
+  /// Used as a fallback when the formats list lacks adaptive streams.
+  final int? topLevelHeight;
 
   const VideoInfo({
     required this.id,
@@ -67,6 +70,7 @@ class VideoInfo {
     this.webpageUrl,
     required this.formats,
     this.extractor,
+    this.topLevelHeight,
   });
 
   factory VideoInfo.fromYtDlpJson(Map<String, dynamic> j) {
@@ -89,6 +93,7 @@ class VideoInfo {
           .map((f) => FormatInfo.fromJson(f as Map<String, dynamic>))
           .toList(),
       extractor: j['extractor'] as String?,
+      topLevelHeight: (j['height'] as num?)?.toInt(),
     );
   }
 
@@ -139,7 +144,10 @@ class VideoInfo {
     for (final f in formats) {
       if (f.height != null && f.height! > max) max = f.height!;
     }
-    return max;
+    // Fall back to the top-level height yt-dlp reported for its best selection
+    // (useful when the formats list only contains combined/legacy streams).
+    if (max == 0 && topLevelHeight != null) return topLevelHeight!;
+    return (topLevelHeight != null && topLevelHeight! > max) ? topLevelHeight! : max;
   }
 
   String get bestQualityLabel {
@@ -155,6 +163,18 @@ class VideoInfo {
   /// Estimated file size string for a given quality tier.
   String estimatedSize(String resolution) {
     if (duration == null) return '~? MB';
+    // 'Best' delegates to whichever quality tier matches the max available height.
+    if (resolution == 'Best') {
+      final h = maxVideoHeight;
+      if (h >= 2160) return estimatedSize('4K');
+      if (h >= 1440) return estimatedSize('1440p');
+      if (h >= 1080) return estimatedSize('1080p');
+      if (h >= 720)  return estimatedSize('720p');
+      if (h >= 480)  return estimatedSize('480p');
+      if (h >= 360)  return estimatedSize('360p');
+      if (h >= 240)  return estimatedSize('240p');
+      return estimatedSize('144p');
+    }
     final d = duration!;
     double mbps;
     switch (resolution) {
@@ -170,12 +190,16 @@ class VideoInfo {
         mbps = 0.75;
       case '360p':
         mbps = 0.4;
+      case '240p':
+        mbps = 0.22;
+      case '144p':
+        mbps = 0.10;
       case '320k':
-        mbps = 320 * 8 / 1000 / 1000;
+        mbps = 320.0 / 1000;
       case '192k':
-        mbps = 192 * 8 / 1000 / 1000;
+        mbps = 192.0 / 1000;
       case '128k':
-        mbps = 128 * 8 / 1000 / 1000;
+        mbps = 128.0 / 1000;
       default:
         return '~? MB';
     }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
+import '../models/download_item.dart';
+import '../providers/app_state.dart';
 import '../widgets/library_card.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -14,19 +16,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   String _activeFilter = 'All';
   final TextEditingController _searchCtrl = TextEditingController();
 
-  final _filters = ['All', 'Video', 'Audio', 'Playlist'];
-
-  // Mock library data
-  final _items = const <_LibItem>[
-    _LibItem('Full Stack App with Next.js 14', '@Fireship', '14:32', '245 MB', 'VIDEO'),
-    _LibItem('Advanced TypeScript Patterns', '@ThePrimeagen', '42:18', '1.2 GB', 'VIDEO'),
-    _LibItem('Lofi Hip Hop - Study Beats', '@ChilledCow', '3:24:00', '48 MB', 'AUDIO'),
-    _LibItem('System Design Interview Guide', '@TechLead', '1:08:45', '890 MB', 'VIDEO'),
-    _LibItem('Docker in 100 Seconds', '@Fireship', '2:14', '32 MB', 'VIDEO'),
-    _LibItem('How Git Works Under the Hood', '@Fireship', '18:26', '189 MB', 'VIDEO'),
-    _LibItem('React 19 Complete Guide', '@Academind', '2:45:30', '1.8 GB', 'VIDEO'),
-    _LibItem('Synthwave Playlist', '@Retrowave', '1:12:00', '96 MB', 'AUDIO'),
-  ];
+  final _filters = ['All', 'Video', 'Audio'];
 
   @override
   void dispose() {
@@ -36,18 +26,78 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildToolbar(),
-        const SizedBox(height: AppColors.gap),
-        Expanded(
-          child: _buildGrid(),
-        ),
-      ],
+    return ListenableBuilder(
+      listenable: AppState.instance,
+      builder: (context, _) {
+        final completed = AppState.instance.downloads
+            .where((d) => d.status == DownloadStatus.done)
+            .toList();
+
+        List<DownloadItem> filtered;
+        if (_activeFilter == 'Video') {
+          filtered = completed.where((d) => !d.resolution.endsWith('k')).toList();
+        } else if (_activeFilter == 'Audio') {
+          filtered = completed.where((d) => d.resolution.endsWith('k')).toList();
+        } else {
+          filtered = completed;
+        }
+
+        final q = _searchCtrl.text.toLowerCase();
+        if (q.isNotEmpty) {
+          filtered = filtered
+              .where((d) => d.title.toLowerCase().contains(q))
+              .toList();
+        }
+
+        return Column(
+          children: [
+            _buildToolbar(completed.length),
+            const SizedBox(height: AppColors.gap),
+            Expanded(
+              child: filtered.isEmpty
+                  ? _buildEmptyState(completed.isEmpty)
+                  : _buildGrid(filtered),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildToolbar() {
+  Widget _buildEmptyState(bool noneDownloaded) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.surface2,
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Icon(Icons.video_library_outlined, size: 26, color: AppColors.muted2),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            noneDownloaded ? 'Your library is empty' : 'No results',
+            style: AppTextStyles.outfit(
+              fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.muted),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            noneDownloaded
+                ? 'Completed downloads will appear here'
+                : 'Try a different filter or search term',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted2),
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildToolbar(int total) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       decoration: BoxDecoration(
@@ -72,7 +122,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              '${_items.length} items',
+              '$total items',
               style: AppTextStyles.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -85,38 +135,39 @@ class _LibraryScreenState extends State<LibraryScreen> {
           Flexible(
             flex: 3,
             child: SizedBox(
-            height: 34,
-            child: TextField(
-              controller: _searchCtrl,
-              style: AppTextStyles.outfit(fontSize: 13),
-              decoration: InputDecoration(
-                hintText: 'Search library...',
-                hintStyle: AppTextStyles.outfit(
-                    fontSize: 13, color: AppColors.muted),
-                prefixIcon: const Padding(
-                  padding: EdgeInsets.only(left: 10, right: 6),
-                  child: Icon(Icons.search_rounded, size: 16, color: AppColors.muted),
-                ),
-                prefixIconConstraints:
-                    const BoxConstraints(minWidth: 0, minHeight: 0),
-                filled: true,
-                fillColor: AppColors.surface2,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(9),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(9),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(9),
-                  borderSide: BorderSide(color: AppColors.green.withOpacity(0.4)),
+              height: 34,
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (_) => setState(() {}),
+                style: AppTextStyles.outfit(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Search library...',
+                  hintStyle: AppTextStyles.outfit(
+                      fontSize: 13, color: AppColors.muted),
+                  prefixIcon: const Padding(
+                    padding: EdgeInsets.only(left: 10, right: 6),
+                    child: Icon(Icons.search_rounded, size: 16, color: AppColors.muted),
+                  ),
+                  prefixIconConstraints:
+                      const BoxConstraints(minWidth: 0, minHeight: 0),
+                  filled: true,
+                  fillColor: AppColors.surface2,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(9),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(9),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(9),
+                    borderSide: BorderSide(color: AppColors.green.withValues(alpha: 0.4)),
+                  ),
                 ),
               ),
-            ),
             ),
           ),
           const SizedBox(width: 14),
@@ -137,7 +188,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       color: isActive ? AppColors.green : AppColors.surface2,
                       border: Border.all(
                         color: isActive
-                            ? AppColors.green.withOpacity(0.4)
+                            ? AppColors.green.withValues(alpha: 0.4)
                             : AppColors.border,
                       ),
                       borderRadius: BorderRadius.circular(8),
@@ -168,7 +219,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.sort_rounded, size: 14, color: AppColors.muted),
+                  const Icon(Icons.sort_rounded, size: 14, color: AppColors.muted),
                   const SizedBox(width: 4),
                   Text(
                     'Sort',
@@ -184,11 +235,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
-  Widget _buildGrid() {
-    final filtered = _activeFilter == 'All'
-        ? _items
-        : _items.where((i) => i.type.toUpperCase() == _activeFilter.toUpperCase()).toList();
-
+  Widget _buildGrid(List<DownloadItem> items) {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 220,
@@ -196,26 +243,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
         crossAxisSpacing: AppColors.gap,
         childAspectRatio: 0.78,
       ),
-      itemCount: filtered.length,
+      itemCount: items.length,
       itemBuilder: (context, i) {
-        final item = filtered[i];
+        final item = items[i];
+        final isAudio = item.resolution.endsWith('k');
         return LibraryCard(
           title: item.title,
-          meta: item.channel,
-          duration: item.duration,
-          size: item.size,
-          isAudio: item.type == 'AUDIO',
+          meta: '${item.resolution} · ${item.format}',
+          duration: '—',
+          size: item.format,
+          isAudio: isAudio,
+          thumbnailUrl: item.thumbnailUrl,
         );
       },
     );
   }
-}
-
-class _LibItem {
-  final String title;
-  final String channel;
-  final String duration;
-  final String size;
-  final String type;
-  const _LibItem(this.title, this.channel, this.duration, this.size, this.type);
 }

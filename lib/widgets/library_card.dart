@@ -11,6 +11,7 @@ class LibraryCard extends StatefulWidget {
   final String duration;
   final bool isAudio;
   final Color? gradientColor;
+  final String? thumbnailUrl;
 
   const LibraryCard({
     super.key,
@@ -20,6 +21,7 @@ class LibraryCard extends StatefulWidget {
     required this.duration,
     this.isAudio = false,
     this.gradientColor,
+    this.thumbnailUrl,
   });
 
   @override
@@ -82,21 +84,39 @@ class _LibraryCardState extends State<LibraryCard> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Radial gradient background
-        Container(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(
-              colors: [
-                accentColor.withOpacity(0.28),
-                widget.isAudio
-                    ? const Color(0xFF080C18)
-                    : const Color(0xFF07110A),
-              ],
-              center: Alignment.center,
-              radius: 1.1,
+        // Background: real thumbnail or gradient
+        if (widget.thumbnailUrl != null)
+          Image.network(
+            widget.thumbnailUrl!,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  colors: [
+                    accentColor.withOpacity(0.28),
+                    widget.isAudio ? const Color(0xFF080C18) : const Color(0xFF07110A),
+                  ],
+                  center: Alignment.center,
+                  radius: 1.1,
+                ),
+              ),
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                colors: [
+                  accentColor.withOpacity(0.28),
+                  widget.isAudio
+                      ? const Color(0xFF080C18)
+                      : const Color(0xFF07110A),
+                ],
+                center: Alignment.center,
+                radius: 1.1,
+              ),
             ),
           ),
-        ),
 
         // Bottom vignette
         Positioned.fill(
@@ -197,25 +217,38 @@ class _LibraryCardState extends State<LibraryCard> {
           ),
         ),
 
-        // Type badge
+        // Type badge — dark opaque background for readability on any thumbnail
         Positioned(
-          top: 7,
-          left: 7,
+          top: 8,
+          left: 8,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.18),
-              border: Border.all(color: accentColor.withOpacity(0.35)),
-              borderRadius: BorderRadius.circular(5),
+              color: Colors.black.withOpacity(0.72),
+              border: Border.all(color: accentColor.withOpacity(0.55)),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Text(
-              widget.isAudio ? 'AUDIO' : 'VIDEO',
-              style: AppTextStyles.outfit(
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
-                color: accentColor,
-                letterSpacing: 0.5,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  widget.isAudio
+                      ? Icons.music_note_rounded
+                      : Icons.movie_rounded,
+                  size: 10,
+                  color: accentColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  widget.isAudio ? 'AUDIO' : 'VIDEO',
+                  style: AppTextStyles.outfit(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: accentColor,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -294,11 +327,12 @@ class _LibraryCardState extends State<LibraryCard> {
 
   Widget _buildInfo(Color accentColor) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Title
           Text(
             widget.title,
             style: AppTextStyles.outfit(
@@ -308,31 +342,55 @@ class _LibraryCardState extends State<LibraryCard> {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 8),
+          // Meta row + format badge
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                widget.meta,
-                style: AppTextStyles.outfit(
-                    fontSize: 11, color: AppColors.muted),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              Expanded(
+                child: Text(
+                  widget.meta,
+                  style: AppTextStyles.outfit(
+                    fontSize: 10.5,
+                    color: AppColors.muted,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const SizedBox(height: 5),
-              Row(
-                children: [
-                  Icon(Icons.inventory_2_rounded,
-                      size: 11, color: accentColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    widget.size,
-                    style: AppTextStyles.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
+              const SizedBox(width: 6),
+              // Format chip — prominent with icon
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.14),
+                  border:
+                      Border.all(color: accentColor.withOpacity(0.45)),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      widget.isAudio
+                          ? Icons.music_note_rounded
+                          : Icons.movie_rounded,
+                      size: 9,
                       color: accentColor,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 3),
+                    Text(
+                      widget.size,
+                      style: AppTextStyles.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: accentColor,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

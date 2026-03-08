@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'developer_screen.dart';
-import 'widgets/app_notification.dart';
 
 class DownloadScreen extends StatefulWidget {
   const DownloadScreen({super.key});
@@ -550,13 +549,67 @@ class _DownloadScreenState extends State<DownloadScreen> {
   }
 
   void _showSuccessDialog(String message) {
-    if (!mounted) return;
-    showAppNotification(
-      context,
-      type: NotificationType.success,
-      message: message,
-      actionLabel: 'OK',
-      duration: const Duration(seconds: 5),
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A1A1A),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: const Color(0xFF00FF41).withOpacity(0.3)),
+          ),
+          title: Row(
+            children: [
+              const Icon(
+                Icons.check_circle,
+                color: Color(0xFF00FF41),
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Success',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          actions: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00FF41), Color(0xFF00CC33)],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    color: Color(0xFF0A0A0A),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1202,11 +1255,19 @@ class _DownloadScreenState extends State<DownloadScreen> {
 
   void _showErrorSnackBar(String message) {
     if (!mounted) return;
-    showAppNotification(
-      context,
-      type: NotificationType.error,
-      message: message,
-      actionLabel: 'OK',
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFFF1744),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        action: SnackBarAction(
+          label: 'OK',
+          onPressed: () {},
+          textColor: Colors.white,
+        ),
+      ),
     );
   }
 

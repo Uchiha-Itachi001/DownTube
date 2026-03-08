@@ -33,6 +33,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   int _selectedTab = 0; // 0 = Video, 1 = Audio
   String _selectedFormat = 'MP4';
   final Set<String> _checkOptions = {'Embed Subtitles', 'Save Thumbnail'};
+  ValueNotifier<bool>? _loadingNotifDismiss;
 
   static const _videoFormats = ['MP4', 'MKV', 'WEBM'];
   static const _audioFormats = ['MP3', 'WAV', 'FLAC'];
@@ -49,6 +50,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   List<_QOption> _videoQualityTiers(VideoInfo? info) {
     if (info == null) {
       return const [
+        _QOption('Best', 'Auto', badge: 'AUTO'),
         _QOption('4K', 'Ultra HD', badge: 'HDR'),
         _QOption('1080p', 'Full HD'),
         _QOption('720p', 'HD'),
@@ -56,13 +58,25 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         _QOption('360p', 'Low'),
       ];
     }
-    // Extract unique heights from actual yt-dlp formats, sorted descending
-    final rawHeights = info.formats
-        .where((f) => f.hasVideo && f.height != null && f.height! >= 144)
+    // Extract unique heights from actual yt-dlp formats.
+    // Use height != null as the video-stream filter — more robust than hasVideo
+    // because some combined/legacy YouTube formats may have null vcodec.
+    final heightSet = info.formats
+        .where((f) => f.height != null && f.height! >= 144)
         .map((f) => f.height!)
-        .toSet()
-        .toList()
-      ..sort((a, b) => b.compareTo(a));
+        .toSet();
+
+    // Always include the top-level height reported by yt-dlp for its best
+    // format selection.  When yt-dlp cannot resolve DASH adaptive streams
+    // (e.g. no Node.js JS-challenge solver) the formats list only contains
+    // low-resolution combined streams (360p/480p), but the top-level height
+    // field still reflects the true best quality (e.g. 1080p/4K).
+    // Without this the quality tiles would never show the real best quality.
+    if (info.topLevelHeight != null && info.topLevelHeight! >= 144) {
+      heightSet.add(info.topLevelHeight!);
+    }
+
+    final rawHeights = heightSet.toList()..sort((a, b) => b.compareTo(a));
 
     if (rawHeights.isEmpty) return [const _QOption('720p', 'HD')];
 
@@ -85,26 +99,47 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         q = const _QOption('360p', 'Low');
       } else if (h >= 240) {
         q = const _QOption('240p', 'Very Low');
+      } else if (h >= 144) {
+        // 144p and 180p both map to the same tier so they deduplicate cleanly.
+        q = const _QOption('144p', 'Minimum');
       } else {
         q = _QOption('${h}p', 'Low');
       }
       if (seen.add(q.res)) result.add(q);
     }
-    return result.isEmpty ? [const _QOption('720p', 'HD')] : result;
+    final tiers = result.isEmpty ? [const _QOption('720p', 'HD')] : result;
+    // Always prepend the "Best" tile so yt-dlp picks the absolute best
+    // quality automatically, matching the old DownTube behaviour.
+    return [const _QOption('Best', 'Auto', badge: 'AUTO'), ...tiers];
   }
 
   List<_QOption> _qualities(VideoInfo? info) =>
       _selectedTab == 0 ? _videoQualityTiers(info) : _audioQ;
 
   String _summaryLabel(VideoInfo? info) {
-    final qs = _qualities(info);
-    if (qs.isEmpty) return '$_selectedFormat';
+    if (_selectedTab == 0) {
+      final qs = _videoQualityTiers(info);
+      final q = qs[_selectedQuality.clamp(0, qs.length - 1)];
+      final size = info?.estimatedSize(q.res) ?? '~? MB';
+      return '${q.res} · $size · $_selectedFormat';
+    }
+    // Audio
+    final qs = _audioQ;
     final q = qs[_selectedQuality.clamp(0, qs.length - 1)];
     final size = info?.estimatedSize(q.res) ?? '~? MB';
     return '${q.res} · $size · $_selectedFormat';
   }
 
-  bool get _isLoading => AppState.instance.fetchState == FetchState.loading;
+  // Show skeleton/loading UI whenever we don't yet have a successful fetch with
+  // real video data.  This prevents fake placeholder quality tiles from appearing
+  // in idle state (before fetch starts) or error state (after a failed fetch).
+  bool get _showSkeleton =>
+      AppState.instance.fetchState != FetchState.success ||
+      AppState.instance.videoInfo == null;
+
+  // Keep the old name as an alias so existing call-sites still compile.
+  bool get _isLoading => _showSkeleton;
+
   VideoInfo? get _info => AppState.instance.videoInfo;
 
   @override
@@ -117,12 +152,15 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         AppState.instance.fetchVideo(widget.initialUrl!);
+        final dismissNotifier = ValueNotifier<bool>(false);
+        _loadingNotifDismiss = dismissNotifier;
         showAppNotification(
           context,
           type: NotificationType.loading,
           message: 'Fetching video info…',
           subtitle: widget.initialUrl,
           duration: const Duration(seconds: 30),
+          dismissController: dismissNotifier,
         );
       });
     }
@@ -137,7 +175,23 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         _selectedFormat = 'MP4';
       }
     });
-    if (AppState.instance.fetchState == FetchState.error) {
+    if (AppState.instance.fetchState == FetchState.success) {
+      // Dismiss the loading notification immediately
+      _loadingNotifDismiss?.value = true;
+      _loadingNotifDismiss = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showAppNotification(
+          context,
+          type: NotificationType.success,
+          message: 'Video ready!',
+          subtitle: AppState.instance.videoInfo?.title,
+          duration: const Duration(seconds: 3),
+        );
+      });
+    } else if (AppState.instance.fetchState == FetchState.error) {
+      _loadingNotifDismiss?.value = true;
+      _loadingNotifDismiss = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         showAppNotification(
@@ -152,6 +206,8 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
 
   @override
   void dispose() {
+    _loadingNotifDismiss?.value = true;
+    _loadingNotifDismiss = null;
     AppState.instance.removeListener(_onStateChange);
     super.dispose();
   }
@@ -188,7 +244,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           children: [
             // Left column: thumbnail (fixed width)
             SizedBox(
-              width: 290,
+              width: 400,
               child: _isLoading ? _buildThumbSkeleton() : _buildThumb(),
             ),
             // Right column: details panel
@@ -225,43 +281,30 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             ),
           ),
         ),
-        // Play button
-        Center(
-          child: Container(
-            width: 64, height: 64,
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.55),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.5),
-              boxShadow: [
-                BoxShadow(color: AppColors.green.withOpacity(0.40), blurRadius: 32, spreadRadius: 2),
-              ],
-            ),
-            child: const Center(
-              child: Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: Icon(Icons.play_arrow_rounded, size: 34, color: Colors.white),
-              ),
-            ),
-          ),
-        ),
         // Quality badge — top left
         Positioned(
           top: 12, left: 12,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.green.withOpacity(0.16),
-              border: Border.all(color: AppColors.green.withOpacity(0.50)),
+              color: Colors.black.withOpacity(0.72),
+              border: Border.all(color: AppColors.green.withOpacity(0.55)),
               borderRadius: BorderRadius.circular(5),
             ),
-            child: Text(
-              _info?.bestQualityLabel ?? '—',
-              style: AppTextStyles.spaceGrotesk(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: AppColors.green,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.high_quality_rounded, size: 11, color: AppColors.green),
+                const SizedBox(width: 4),
+                Text(
+                  _info?.bestQualityLabel ?? '—',
+                  style: AppTextStyles.spaceGrotesk(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.green,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -287,27 +330,19 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         // Platform badge — bottom right
         Positioned(
           bottom: 12, right: 12,
+          child: _PlatformBadge(extractor: _info?.extractor),
+        ),
+        // Right-edge blend so the thumbnail fades into the container bg
+        Positioned(
+          top: 0, bottom: 0, right: 0,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.18),
-              border: Border.all(color: Colors.red.withOpacity(0.30)),
-              borderRadius: BorderRadius.circular(5),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.play_circle_fill_rounded, size: 12, color: Color(0xFFF87171)),
-                const SizedBox(width: 4),
-                Text(
-                  _extractorLabel,
-                  style: AppTextStyles.spaceGrotesk(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFFF87171),
-                  ),
-                ),
-              ],
+            width: 48,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [Colors.transparent, Color(0xFF080C09)],
+              ),
             ),
           ),
         ),
@@ -315,14 +350,6 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     );
   }
 
-  String get _extractorLabel {
-    final e = _info?.extractor?.toLowerCase() ?? 'youtube';
-    if (e.contains('youtube')) return 'YouTube';
-    if (e.contains('vimeo')) return 'Vimeo';
-    if (e.contains('twitch')) return 'Twitch';
-    if (e.contains('tiktok')) return 'TikTok';
-    return _info?.extractor ?? 'Video';
-  }
 
   Widget _thumbGradient() {
     return Stack(
@@ -561,7 +588,6 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           const SizedBox(height: 10),
           _buildQualityRow(info),
           const SizedBox(height: 20),
-
           _gradientDivider(),
           const SizedBox(height: 20),
 
@@ -662,22 +688,20 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
 
   Widget _buildQualityRow(VideoInfo? info) {
     final quals = _qualities(info);
-    return Row(
+    if (quals.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
       children: List.generate(quals.length, (i) {
         final sizeStr = info?.estimatedSize(quals[i].res) ?? '~? MB';
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(right: i < quals.length - 1 ? 8 : 0),
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedQuality = i),
-              child: _QualityTile(
-                res: quals[i].res,
-                name: quals[i].name,
-                size: sizeStr,
-                badge: quals[i].badge,
-                isSelected: _selectedQuality == i,
-              ),
-            ),
+        return GestureDetector(
+          onTap: () => setState(() => _selectedQuality = i),
+          child: _QualityTile(
+            res: quals[i].res,
+            name: quals[i].name,
+            size: sizeStr,
+            badge: quals[i].badge,
+            isSelected: _selectedQuality == i,
           ),
         );
       }),
@@ -778,14 +802,13 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             ShimmerBox(width: 110, height: 28, borderRadius: 9),
           ]),
           const SizedBox(height: 20),
-          const ShimmerBox(width: 60, height: 10, borderRadius: 4),
-          const SizedBox(height: 10),
-          Row(children: List.generate(5, (i) => Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(right: i < 4 ? 8 : 0),
-              child: const ShimmerBox(height: 78, borderRadius: 12),
-            ),
-          ))),
+          // Quality rows skeleton
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(
+                5, (_) => const ShimmerBox(width: 106, height: 94, borderRadius: 10)),
+          ),
           const SizedBox(height: 20),
           const ShimmerBox(height: 1, borderRadius: 0),
           const SizedBox(height: 20),
@@ -800,6 +823,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   }
 
   Widget _buildActionBar() {
+    if (_showSkeleton) return _buildActionBarSkeleton();
     final info = _info;
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
@@ -837,15 +861,48 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     );
   }
 
+  Widget _buildActionBarSkeleton() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
+      decoration: BoxDecoration(
+        color: AppColors.surface1,
+        border: Border.all(color: AppColors.green.withOpacity(0.12)),
+        borderRadius: BorderRadius.circular(AppColors.radius),
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ShimmerBox(width: 200, height: 13, borderRadius: 4),
+                SizedBox(height: 6),
+                ShimmerBox(width: 130, height: 11, borderRadius: 4),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          const ShimmerBox(width: 100, height: 38, borderRadius: 10),
+          const SizedBox(width: 10),
+          const ShimmerBox(width: 150, height: 38, borderRadius: 10),
+        ],
+      ),
+    );
+  }
+
+  String get _selectedResolution {
+    final qs = _qualities(_info);
+    return qs[_selectedQuality.clamp(0, qs.length - 1)].res;
+  }
+
   void _onQueue() {
     final info = _info;
     if (info == null) return;
-    final qs = _qualities(info);
-    final q = qs[_selectedQuality.clamp(0, qs.length - 1)];
     AppState.instance.enqueueDownload(DownloadItem(
       title: info.title,
       url: AppState.instance.currentUrl ?? '',
-      resolution: q.res,
+      resolution: _selectedResolution,
       format: _selectedFormat,
       outputPath: AppState.instance.downloadPath ?? '',
       thumbnailUrl: info.thumbnail,
@@ -857,12 +914,10 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   void _onDownload() {
     final info = _info;
     if (info == null) return;
-    final qs = _qualities(info);
-    final q = qs[_selectedQuality.clamp(0, qs.length - 1)];
     AppState.instance.enqueueDownload(DownloadItem(
       title: info.title,
       url: AppState.instance.currentUrl ?? '',
-      resolution: q.res,
+      resolution: _selectedResolution,
       format: _selectedFormat,
       outputPath: AppState.instance.downloadPath ?? '',
       thumbnailUrl: info.thumbnail,
@@ -947,110 +1002,191 @@ class _QualityTile extends StatefulWidget {
 class _QualityTileState extends State<_QualityTile> {
   bool _hov = false;
 
+  static IconData _iconFor(String res) {
+    switch (res) {
+      case 'Best':  return Icons.auto_awesome_rounded;
+      case '4K':
+      case '1440p':  return Icons.hd_rounded;
+      case '1080p':  return Icons.high_quality_rounded;
+      case '720p':   return Icons.hd_outlined;
+      case '480p':
+      case '360p':   return Icons.sd_rounded;
+      default:
+        if (res.endsWith('k')) return Icons.music_note_rounded;
+        return Icons.signal_cellular_4_bar_rounded;
+    }
+  }
+
+  static Color _accentFor(String res) {
+    switch (res) {
+      case 'Best':   return AppColors.green;
+      case '4K':     return const Color(0xFF8B5CF6);
+      case '1440p':  return AppColors.blue;
+      case '1080p':  return AppColors.green;
+      case '720p':   return const Color(0xFF0EA5E9);
+      case '480p':   return AppColors.yellow;
+      case '360p':
+      case '240p':   return const Color(0xFFF97316);
+      case '144p':   return AppColors.red;
+      default:
+        if (res.endsWith('k')) return AppColors.blue;
+        return AppColors.muted;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sel = widget.isSelected;
+    final accent = _accentFor(widget.res);
+    final badgeColor = widget.badge == 'AUTO' ? accent : AppColors.yellow;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hov = true),
-      onExit:  (_) => setState(() => _hov = false),
+      onExit: (_) => setState(() => _hov = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        duration: const Duration(milliseconds: 160),
+        width: 106,
         decoration: BoxDecoration(
           color: sel
-              ? AppColors.green.withOpacity(0.09)
+              ? accent.withValues(alpha: 0.09)
               : (_hov ? AppColors.surface3 : AppColors.surface2),
           border: Border.all(
             color: sel
-                ? AppColors.green
-                : (_hov ? AppColors.green.withOpacity(0.28) : AppColors.border),
+                ? accent.withValues(alpha: 0.60)
+                : (_hov
+                    ? AppColors.green.withValues(alpha: 0.20)
+                    : AppColors.border),
             width: sel ? 1.5 : 1.0,
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           boxShadow: sel
               ? [
-                  BoxShadow(color: AppColors.green.withOpacity(0.18), blurRadius: 20, offset: const Offset(0, 4)),
-                  BoxShadow(color: AppColors.green.withOpacity(0.06), blurRadius: 40, spreadRadius: 2),
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.16),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  )
                 ]
               : null,
         ),
-        child: Stack(
-          clipBehavior: Clip.none,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Resolution — Space Grotesk for that technical number feel
-                Text(
-                  widget.res,
-                  style: AppTextStyles.spaceGrotesk(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: sel ? AppColors.green : AppColors.text,
-                    letterSpacing: -0.5,
+            // Accent bar at top
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              height: 3,
+              color: sel ? accent : Colors.transparent,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Icon row + badge/check
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: (sel ? accent : AppColors.muted)
+                              .withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            _iconFor(widget.res),
+                            size: 14,
+                            color: sel ? accent : AppColors.muted,
+                          ),
+                        ),
+                      ),
+                      if (widget.badge != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: badgeColor.withValues(alpha: 0.12),
+                            border: Border.all(
+                                color: badgeColor.withValues(alpha: 0.38)),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            widget.badge!,
+                            style: AppTextStyles.spaceGrotesk(
+                              fontSize: 7,
+                              fontWeight: FontWeight.w700,
+                              color: badgeColor,
+                            ),
+                          ),
+                        )
+                      else if (sel)
+                        Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: accent.withValues(alpha: 0.40),
+                                blurRadius: 6,
+                              )
+                            ],
+                          ),
+                          child: const Center(
+                            child: Icon(Icons.check_rounded,
+                                size: 10, color: Colors.black),
+                          ),
+                        ),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 3),
-                // Quality name — Outfit, subdued label
-                Text(
-                  widget.name,
-                  style: AppTextStyles.outfit(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.muted,
+                  const SizedBox(height: 8),
+                  // Resolution
+                  Text(
+                    widget.res,
+                    style: AppTextStyles.spaceGrotesk(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: sel ? accent : AppColors.text,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                // File size — JetBrains Mono for data value aesthetic
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: sel
-                        ? AppColors.green.withOpacity(0.14)
-                        : AppColors.bg.withOpacity(0.55),
-                    borderRadius: BorderRadius.circular(5),
-                    border: sel
-                        ? Border.all(color: AppColors.green.withOpacity(0.35))
-                        : Border.all(color: AppColors.border),
+                  const SizedBox(height: 1),
+                  // Quality name
+                  Text(
+                    widget.name,
+                    style: AppTextStyles.outfit(
+                      fontSize: 10,
+                      color: sel
+                          ? accent.withValues(alpha: 0.70)
+                          : AppColors.muted,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  child: Text(
+                  const SizedBox(height: 5),
+                  // File size
+                  Text(
                     widget.size,
                     style: AppTextStyles.mono(
                       fontSize: 9,
                       fontWeight: FontWeight.w600,
-                      color: sel ? AppColors.green : AppColors.muted,
+                      color: sel
+                          ? accent.withValues(alpha: 0.50)
+                          : AppColors.muted2,
                     ),
-                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            ),
-            if (widget.badge != null)
-              Positioned(
-                top: -10, right: -6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: const BoxDecoration(
-                    color: AppColors.yellow,
-                    borderRadius: BorderRadius.only(
-                      topRight: Radius.circular(10),
-                      bottomLeft: Radius.circular(6),
-                    ),
-                  ),
-                  child: Text(
-                    widget.badge!,
-                    style: AppTextStyles.spaceGrotesk(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
+                ],
               ),
+            ),
           ],
         ),
       ),
@@ -1101,4 +1237,66 @@ class _GridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_GridPainter old) => false;
+}
+
+// ── Platform badge with per-platform colour ───────────────────────────────────
+
+class _PlatformBadge extends StatelessWidget {
+  final String? extractor;
+  const _PlatformBadge({this.extractor});
+
+  // Returns (label, icon, colour) for each platform.
+  (String, IconData, Color) get _meta {
+    final e = extractor?.toLowerCase() ?? '';
+    if (e.contains('youtube')) {
+      return ('YouTube', Icons.play_circle_fill_rounded, const Color(0xFFFF4444));
+    }
+    if (e.contains('instagram')) {
+      return ('Instagram', Icons.camera_alt_rounded, const Color(0xFFE1306C));
+    }
+    if (e.contains('facebook')) {
+      return ('Facebook', Icons.facebook_rounded, const Color(0xFF1877F2));
+    }
+    if (e.contains('twitch')) {
+      return ('Twitch', Icons.stream_rounded, const Color(0xFF9146FF));
+    }
+    if (e.contains('tiktok')) {
+      return ('TikTok', Icons.music_video_rounded, const Color(0xFF69C9D0));
+    }
+    if (e.contains('twitter') || e.contains('x.com')) {
+      return ('Twitter/X', Icons.alternate_email_rounded, const Color(0xFF1DA1F2));
+    }
+    if (e.contains('vimeo')) {
+      return ('Vimeo', Icons.play_circle_outline_rounded, const Color(0xFF1AB7EA));
+    }
+    return ('Video', Icons.videocam_rounded, const Color(0xFF94A3B8));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, icon, color) = _meta;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.72),
+        border: Border.all(color: color.withOpacity(0.60)),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: AppTextStyles.spaceGrotesk(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

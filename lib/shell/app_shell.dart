@@ -31,8 +31,8 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  Widget _buildScreen() {
-    switch (_selectedIndex) {
+  Widget _buildNonAnalyzeScreen() {
+    switch (_selectedIndex < 5 ? _selectedIndex : 0) {
       case 0:
         return DashboardScreen(onAnalyze: _goToAnalyzed);
       case 1:
@@ -43,12 +43,6 @@ class _AppShellState extends State<AppShell> {
         return const HistoryScreen();
       case 4:
         return const SettingsScreen();
-      case 5:
-        return AnalyzedScreen(
-          key: ValueKey(_pendingUrl),
-          initialUrl: _pendingUrl,
-          onDownload: () => _onNavSelected(2),
-        );
       default:
         return DashboardScreen(onAnalyze: _goToAnalyzed);
     }
@@ -104,19 +98,41 @@ class _AppShellState extends State<AppShell> {
                   child: Row(
                     children: [
                       Sidebar(
-                        selectedIndex: _selectedIndex > 4 ? -1 : _selectedIndex,
+                        selectedIndex: _selectedIndex,
                         onItemSelected: _onNavSelected,
+                        hasAnalysis: _pendingUrl != null,
+                        onAnalyzeSelected: () => _onNavSelected(5),
                         width: sidebarWidth,
                         collapsed: collapsed,
                       ),
                       const SizedBox(width: AppColors.gap),
                       Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child: KeyedSubtree(
-                            key: ValueKey(_selectedIndex),
-                            child: _buildScreen(),
-                          ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // Screens 0–4: swapped via AnimatedSwitcher
+                            Offstage(
+                              offstage: _selectedIndex == 5,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                child: KeyedSubtree(
+                                  key: ValueKey(
+                                      _selectedIndex < 5 ? _selectedIndex : 0),
+                                  child: _buildNonAnalyzeScreen(),
+                                ),
+                              ),
+                            ),
+                            // Analyze screen — kept alive in the widget tree
+                            if (_pendingUrl != null)
+                              Offstage(
+                                offstage: _selectedIndex != 5,
+                                child: AnalyzedScreen(
+                                  key: ValueKey(_pendingUrl),
+                                  initialUrl: _pendingUrl,
+                                  onDownload: () => _onNavSelected(2),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],

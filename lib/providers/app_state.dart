@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import '../models/video_info.dart';
 import '../models/download_item.dart';
 import '../services/prefs_service.dart';
@@ -56,7 +57,12 @@ class AppState extends ChangeNotifier {
 
     try {
       final json = await ytDlp.fetchMetadata(url);
-      if (json == null) throw Exception('No metadata returned from yt-dlp');
+      if (json == null) {
+        throw Exception(
+          'yt-dlp could not fetch video info.\n'
+          'Try: update yt-dlp, install Node.js, or sign in to YouTube in Chrome/Firefox.',
+        );
+      }
       videoInfo = VideoInfo.fromYtDlpJson(json);
       fetchState = FetchState.success;
     } catch (e) {
@@ -86,23 +92,57 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     final res = item.resolution;
+    final fmt = item.format.toLowerCase(); // e.g. 'mp4', 'mkv', 'webm', 'mp3'
     final String formatSelector;
+    final String outputFormat;
+    bool audioOnly = false;
+    String audioQuality = '0';
+
     if (res.endsWith('k')) {
-      final kbps = res.replaceAll('k', '');
-      formatSelector = 'ba[abr<=$kbps]';
+      // Audio download: use bestaudio and post-process with -x --audio-format
+      // The quality tier maps directly to a bitrate for the output encoder.
+      final kbps = int.tryParse(res.replaceAll('k', '')) ?? 320;
+      formatSelector = 'bestaudio/best';
+      outputFormat = fmt.isEmpty ? 'mp3' : fmt;
+      audioOnly = true;
+      // Map kbps to an audio-quality spec that yt-dlp/ffmpeg understand
+      audioQuality = switch (kbps) {
+        >= 320 => '320K',
+        >= 192 => '192K',
+        _ => '128K',
+      };
+    } else if (res == 'Best') {
+      // "Best" tile — let yt-dlp pick the absolute best video+audio stream,
+      // same behaviour as the original DownTube app.
+      formatSelector = 'bestvideo+bestaudio/best';
+      outputFormat = fmt.isEmpty ? 'mp4' : fmt;
     } else {
-      final h = res.replaceAll('p', '').replaceAll('K', '').replaceAll('4', '2160');
-      formatSelector = 'bv[height<=$h]+ba/best';
+      // Video quality like '4K', '1080p', '720p', '480p', '360p', '240p', '144p'
+      // NOTE: replaceAll('4','2160') would corrupt any height that contains
+      // the digit 4 (1440p→12160, 480p→21608, 240p→22160).  Parse cleanly:
+      final String heightStr = res == '4K' ? '2160' : res.replaceAll('p', '');
+      formatSelector = 'bestvideo[height<=$heightStr]+bestaudio/best[height<=$heightStr]/best';
+      outputFormat = fmt.isEmpty ? 'mp4' : fmt;
     }
 
-    final outputTmpl =
-        '${item.outputPath}\\%(title)s.%(ext)s';
+    final String effectivePath = item.outputPath.isNotEmpty
+        ? item.outputPath
+        : '${Platform.environment['USERPROFILE'] ?? Platform.environment['HOME'] ?? '.'}\\Videos\\DownTube';
+
+    // Ensure output directory exists
+    final dir = Directory(effectivePath);
+    if (!await dir.exists()) await dir.create(recursive: true);
+
+    final outputTmpl = '$effectivePath\\%(title)s.%(ext)s';
 
     try {
       await for (final line in ytDlp.startDownload(
         url: item.url,
         formatSelector: formatSelector,
         outputTemplate: outputTmpl,
+        outputFormat: outputFormat,
+        audioOnly: audioOnly,
+        audioQuality: audioQuality,
       )) {
         if (line.contains('[download]') && line.contains('%')) {
           final pct = RegExp(r'(\d+\.?\d*)%').firstMatch(line);

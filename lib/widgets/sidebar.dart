@@ -7,6 +7,8 @@ class Sidebar extends StatelessWidget {
   final ValueChanged<int> onItemSelected;
   final double width;
   final bool collapsed;
+  final bool hasAnalysis;
+  final VoidCallback? onAnalyzeSelected;
 
   const Sidebar({
     super.key,
@@ -14,6 +16,8 @@ class Sidebar extends StatelessWidget {
     required this.onItemSelected,
     this.width = 210,
     this.collapsed = false,
+    this.hasAnalysis = false,
+    this.onAnalyzeSelected,
   });
 
   @override
@@ -72,6 +76,15 @@ class Sidebar extends StatelessWidget {
                     onTap: () => onItemSelected(0),
                     collapsed: collapsed,
                   ),
+                  if (hasAnalysis)
+                    _NavItem(
+                      icon: Icons.analytics_rounded,
+                      label: 'Analyze',
+                      isActive: selectedIndex == 5,
+                      onTap: () => onAnalyzeSelected?.call(),
+                      collapsed: collapsed,
+                      accent: const Color(0xFF22C55E),
+                    ),
                   _NavItem(
                     icon: Icons.video_library_rounded,
                     label: 'Library',
@@ -174,6 +187,7 @@ class _NavItem extends StatefulWidget {
   final bool isActive;
   final VoidCallback onTap;
   final bool collapsed;
+  final Color? accent;
 
   const _NavItem({
     required this.icon,
@@ -182,6 +196,7 @@ class _NavItem extends StatefulWidget {
     required this.isActive,
     required this.onTap,
     this.collapsed = false,
+    this.accent,
   });
 
   @override
@@ -194,14 +209,15 @@ class _NavItemState extends State<_NavItem> {
   @override
   Widget build(BuildContext context) {
     final isActive = widget.isActive;
+    final accent = widget.accent ?? AppColors.green;
     final bg = isActive
-        ? AppColors.greenDim
+        ? accent.withOpacity(0.12)
         : (_hovered ? AppColors.surface2 : Colors.transparent);
     final borderColor = isActive
-        ? AppColors.green.withOpacity(0.2)
+        ? accent.withOpacity(0.25)
         : Colors.transparent;
     final iconColor = isActive
-        ? AppColors.green
+        ? accent
         : (_hovered ? AppColors.text : AppColors.muted);
 
     if (widget.collapsed) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import '../models/download_item.dart';
+import '../providers/app_state.dart';
 import '../widgets/download_item_tile.dart';
 import '../widgets/section_card.dart';
 import '../widgets/sparkline_chart.dart';
@@ -13,150 +14,222 @@ class DownloadsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final narrow = constraints.maxWidth < 750;
-      if (narrow) {
-        return SingleChildScrollView(
-          child: Column(
-            children: [
-              _buildActiveSection(),
-              const SizedBox(height: AppColors.gap),
-              _buildCompletedSection(),
-              const SizedBox(height: AppColors.gap),
-              _buildSessionStats(),
-              const SizedBox(height: AppColors.gap),
-              _buildSpeedPanel(),
-              const SizedBox(height: AppColors.gap),
-              _buildQuickAdd(),
-            ],
-          ),
-        );
-      }
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Main area
-          Expanded(
-            flex: 3,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.only(right: AppColors.gap),
+    return ListenableBuilder(
+      listenable: AppState.instance,
+      builder: (context, _) {
+        final all = AppState.instance.downloads;
+        final active = all
+            .where((d) =>
+                d.status == DownloadStatus.downloading ||
+                d.status == DownloadStatus.queued)
+            .toList();
+        final completed = all
+            .where((d) =>
+                d.status == DownloadStatus.done ||
+                d.status == DownloadStatus.error)
+            .toList();
+
+        return LayoutBuilder(builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 750;
+          if (narrow) {
+            return SingleChildScrollView(
               child: Column(
                 children: [
-                  _buildActiveSection(),
+                  _buildActiveSection(active),
                   const SizedBox(height: AppColors.gap),
-                  _buildCompletedSection(),
-                ],
-              ),
-            ),
-          ),
-          // Side panel
-          SizedBox(
-            width: 260,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildSessionStats(),
+                  _buildCompletedSection(completed),
                   const SizedBox(height: AppColors.gap),
-                  _buildSpeedPanel(),
+                  _buildSessionStats(all),
+                  const SizedBox(height: AppColors.gap),
+                  _buildSpeedPanel(active),
                   const SizedBox(height: AppColors.gap),
                   _buildQuickAdd(),
                 ],
               ),
-            ),
-          ),
-        ],
-      );
-    });
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: AppColors.gap),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildActiveSection(active, expand: true),
+                      const SizedBox(height: AppColors.gap),
+                      _buildCompletedSection(completed, expand: true),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 260,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _buildSessionStats(all),
+                      const SizedBox(height: AppColors.gap),
+                      _buildSpeedPanel(active),
+                      const SizedBox(height: AppColors.gap),
+                      _buildQuickAdd(),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        });
+      },
+    );
   }
 
-  Widget _buildActiveSection() {
+  Widget _buildActiveSection(List<DownloadItem> active, {bool expand = false}) {
+    Widget body;
+    if (active.isEmpty) {
+      body = _emptyState('No active downloads', Icons.download_outlined,
+          subtitle: 'Analyze a video and start a download to see it here');
+    } else if (expand) {
+      body = ListView(
+        shrinkWrap: false,
+        padding: EdgeInsets.zero,
+        children: active
+            .map((item) => DownloadItemTile(
+                  title: item.title,
+                  icon: item.resolution.endsWith('k')
+                      ? Icons.music_note_rounded
+                      : Icons.movie_rounded,
+                  progress: item.progress,
+                  status: item.status,
+                  speed: item.speed,
+                  eta: item.eta,
+                  meta: '${item.resolution} · ${item.format}',
+                ))
+            .toList(),
+      );
+    } else {
+      body = Column(
+        children: active
+            .map((item) => DownloadItemTile(
+                  title: item.title,
+                  icon: item.resolution.endsWith('k')
+                      ? Icons.music_note_rounded
+                      : Icons.movie_rounded,
+                  progress: item.progress,
+                  status: item.status,
+                  speed: item.speed,
+                  eta: item.eta,
+                  meta: '${item.resolution} · ${item.format}',
+                ))
+            .toList(),
+      );
+    }
     return SectionCard(
       title: 'ACTIVE DOWNLOADS',
-      count: '3',
-      actions: [
-        SectionAction(label: 'Pause All', icon: Icons.pause_rounded, onTap: () {}),
-        SectionAction(label: 'Clear Done', icon: Icons.clear_all_rounded, onTap: () {}),
-      ],
-      child: Column(
-        children: [
-          DownloadItemTile(
-            title: 'Building a Full Stack App with Next.js 14',
-            meta: '@Fireship · 1080p · MP4',
-            progress: 0.67,
-            status: DownloadStatus.downloading,
-            speed: '12.4 MB/s',
-            eta: '2:34',
-          ),
-          const SizedBox(height: 6),
-          DownloadItemTile(
-            title: 'Advanced TypeScript Patterns for React',
-            meta: '@ThePrimeagen · 4K · MKV',
-            progress: 0.34,
-            status: DownloadStatus.downloading,
-            speed: '8.7 MB/s',
-            eta: '5:12',
-          ),
-          const SizedBox(height: 6),
-          DownloadItemTile(
-            title: 'System Design Interview Complete Guide',
-            meta: '@TechLead · 720p · MP4',
-            progress: 0.0,
-            status: DownloadStatus.queued,
-          ),
-        ],
-      ),
+      count: '${active.length}',
+      expand: expand,
+      actions: active.isNotEmpty
+          ? [SectionAction(label: 'Clear Done', icon: Icons.clear_all_rounded, onTap: () {})]
+          : null,
+      child: body,
     );
   }
 
-  Widget _buildCompletedSection() {
+  Widget _buildCompletedSection(List<DownloadItem> completed, {bool expand = false}) {
+    Widget body;
+    if (completed.isEmpty) {
+      body = _emptyState('No completed downloads', Icons.check_circle_outline_rounded,
+          subtitle: 'Finished downloads will appear here');
+    } else if (expand) {
+      body = ListView(
+        shrinkWrap: false,
+        padding: EdgeInsets.zero,
+        children: completed
+            .map((item) => DownloadItemTile(
+                  title: item.title,
+                  icon: item.resolution.endsWith('k')
+                      ? Icons.music_note_rounded
+                      : Icons.movie_rounded,
+                  progress: item.progress,
+                  status: item.status,
+                  meta: item.status == DownloadStatus.error
+                      ? 'Error: ${item.errorMessage ?? "unknown"}'
+                      : '${item.resolution} · ${item.format}',
+                ))
+            .toList(),
+      );
+    } else {
+      body = Column(
+        children: completed
+            .map((item) => DownloadItemTile(
+                  title: item.title,
+                  icon: item.resolution.endsWith('k')
+                      ? Icons.music_note_rounded
+                      : Icons.movie_rounded,
+                  progress: item.progress,
+                  status: item.status,
+                  meta: item.status == DownloadStatus.error
+                      ? 'Error: ${item.errorMessage ?? "unknown"}'
+                      : '${item.resolution} · ${item.format}',
+                ))
+            .toList(),
+      );
+    }
     return SectionCard(
       title: 'COMPLETED',
-      count: '12',
-      child: Column(
-        children: [
-          DownloadItemTile(
-            title: 'How Git Works Under the Hood',
-            meta: '@Fireship · 1080p · MP4 · 245 MB',
-            progress: 1.0,
-            status: DownloadStatus.done,
-          ),
-          const SizedBox(height: 6),
-          DownloadItemTile(
-            title: 'Docker in 100 Seconds',
-            meta: '@Fireship · 720p · MP4 · 32 MB',
-            progress: 1.0,
-            status: DownloadStatus.done,
-          ),
-          const SizedBox(height: 6),
-          DownloadItemTile(
-            title: 'Why Rust is Taking Over',
-            meta: '@NoBoilerplate · 1080p · MP4 · 189 MB',
-            progress: 1.0,
-            status: DownloadStatus.done,
-          ),
-        ],
+      count: '${completed.length}',
+      expand: expand,
+      child: body,
+    );
+  }
+
+  Widget _emptyState(String label, IconData icon, {String? subtitle}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.surface2,
+                border: Border.all(color: AppColors.border, width: 1),
+              ),
+              child: Icon(icon, size: 24, color: AppColors.muted2),
+            ),
+            const SizedBox(height: 14),
+            Text(label,
+                style: AppTextStyles.outfit(
+                    fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.muted)),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(subtitle,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted2)),
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSessionStats() {
+  Widget _buildSessionStats(List<DownloadItem> all) {
+    final done = all.where((d) => d.status == DownloadStatus.done).length;
+    final active = all.where((d) => d.status == DownloadStatus.downloading).length;
     return SectionCard(
       title: 'SESSION STATS',
       child: Column(
         children: [
           Row(
-            children: const [
-              Expanded(child: StatTile(value: '3', label: 'Active', unit: '')),
-              SizedBox(width: 8),
-              Expanded(child: StatTile(value: '12', label: 'Done Today', unit: '')),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: const [
-              Expanded(child: StatTile(value: '2.4', label: 'Downloaded', unit: 'GB')),
-              SizedBox(width: 8),
-              Expanded(child: StatTile(value: '14.2', label: 'Avg Speed', unit: 'MB/s')),
+            children: [
+              Expanded(child: StatTile(value: '$active', label: 'Active', unit: '')),
+              const SizedBox(width: 8),
+              Expanded(child: StatTile(value: '$done', label: 'Done Today', unit: '')),
             ],
           ),
         ],
@@ -164,7 +237,24 @@ class DownloadsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSpeedPanel() {
+  Widget _buildSpeedPanel(List<DownloadItem> active) {
+    final rawSpeed = active.isNotEmpty ? (active.first.speed ?? '') : '';
+    // Parse "369.91KiB/s" or "12.4 MiB/s" → (num, unit)
+    String speedNum = '—';
+    String speedUnit = '';
+    if (rawSpeed.isNotEmpty) {
+      final parts = rawSpeed.trim().split(' ');
+      if (parts.length >= 2) {
+        speedNum = parts[0];
+        speedUnit = parts.sublist(1).join(' ');
+      } else {
+        // No space separator (e.g. "369.91KiB/s")
+        final m = RegExp(r'^([\d.]+)(.+)$').firstMatch(rawSpeed.trim());
+        speedNum = m?.group(1) ?? rawSpeed;
+        speedUnit = m?.group(2)?.trim() ?? '';
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -201,29 +291,37 @@ class DownloadsScreen extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                '12.4',
-                style: AppTextStyles.syne(
-                  fontSize: 36,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 7),
-                child: Text(
-                  'MB/s',
-                  style: AppTextStyles.outfit(
-                    fontSize: 14,
-                    color: AppColors.muted,
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.bottomLeft,
+                  child: Text(
+                    speedNum,
+                    style: AppTextStyles.syne(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
+              if (speedUnit.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 7),
+                  child: Text(
+                    speedUnit,
+                    style: AppTextStyles.outfit(
+                      fontSize: 13,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
-          SparklineChart(
-            values: const [3, 5, 7, 4, 8, 12, 9, 11, 14, 10, 8, 12, 15, 11, 13],
+          const SparklineChart(
+            values: [3, 5, 7, 4, 8, 12, 9, 11, 14, 10, 8, 12, 15, 11, 13],
             height: 50,
           ),
         ],
