@@ -12,6 +12,7 @@ enum NotificationType { error, success, info, loading }
 class AppNotificationCard extends StatelessWidget {
   final NotificationType type;
   final String message;
+  final String? subtitle;
   final String? actionLabel;
   final VoidCallback? onAction;
   final VoidCallback? onDismiss;
@@ -20,6 +21,7 @@ class AppNotificationCard extends StatelessWidget {
     super.key,
     required this.type,
     required this.message,
+    this.subtitle,
     this.actionLabel,
     this.onAction,
     this.onDismiss,
@@ -203,6 +205,17 @@ class AppNotificationCard extends StatelessWidget {
                             height: 1.45,
                           ),
                         ),
+                        if (subtitle != null) ...[  
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle!,
+                            style: AppTextStyles.outfit(
+                              fontSize: 11,
+                              color: AppColors.muted,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -301,6 +314,7 @@ void showAppNotification(
   BuildContext context, {
   required NotificationType type,
   required String message,
+  String? subtitle,
   String? actionLabel,
   VoidCallback? onAction,
   Duration duration = const Duration(seconds: 4),
@@ -312,6 +326,7 @@ void showAppNotification(
     builder: (_) => _FloatingNotification(
       type: type,
       message: message,
+      subtitle: subtitle,
       actionLabel: actionLabel,
       onAction: onAction,
       onDismiss: () => entry.remove(),
@@ -325,6 +340,7 @@ void showAppNotification(
 class _FloatingNotification extends StatefulWidget {
   final NotificationType type;
   final String message;
+  final String? subtitle;
   final String? actionLabel;
   final VoidCallback? onAction;
   final VoidCallback onDismiss;
@@ -333,6 +349,7 @@ class _FloatingNotification extends StatefulWidget {
   const _FloatingNotification({
     required this.type,
     required this.message,
+    this.subtitle,
     this.actionLabel,
     this.onAction,
     required this.onDismiss,
@@ -411,6 +428,7 @@ class _FloatingNotificationState extends State<_FloatingNotification>
                   child: AppNotificationCard(
                     type: widget.type,
                     message: widget.message,
+                    subtitle: widget.subtitle,
                     actionLabel: widget.actionLabel,
                     onAction: widget.onAction != null
                         ? () {

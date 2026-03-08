@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../providers/app_state.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/app_header.dart';
 import '../screens/dashboard_screen.dart';
@@ -18,9 +19,17 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
+  String? _pendingUrl;
 
   void _onNavSelected(int index) => setState(() => _selectedIndex = index);
-  void _goToAnalyzed() => setState(() => _selectedIndex = 5);
+
+  void _goToAnalyzed(String url) {
+    AppState.instance.resetFetch();
+    setState(() {
+      _pendingUrl = url;
+      _selectedIndex = 5;
+    });
+  }
 
   Widget _buildScreen() {
     switch (_selectedIndex) {
@@ -35,7 +44,11 @@ class _AppShellState extends State<AppShell> {
       case 4:
         return const SettingsScreen();
       case 5:
-        return AnalyzedScreen(onDownload: () => _onNavSelected(2));
+        return AnalyzedScreen(
+          key: ValueKey(_pendingUrl),
+          initialUrl: _pendingUrl,
+          onDownload: () => _onNavSelected(2),
+        );
       default:
         return DashboardScreen(onAnalyze: _goToAnalyzed);
     }

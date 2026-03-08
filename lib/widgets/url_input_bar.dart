@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import 'app_notification.dart';
 
 class UrlInputBar extends StatefulWidget {
   final String placeholder;
-  final VoidCallback? onAnalyze;
+  final Function(String url)? onAnalyze;
   final VoidCallback? onPaste;
   final bool compact;
   /// Optional inline status shown below the bar (error / success / fetching)
@@ -28,6 +29,7 @@ class UrlInputBar extends StatefulWidget {
 
 class _UrlInputBarState extends State<UrlInputBar> {
   final FocusNode _focusNode = FocusNode();
+  final TextEditingController _textCtrl = TextEditingController();
   bool _focused = false;
 
   @override
@@ -41,7 +43,42 @@ class _UrlInputBarState extends State<UrlInputBar> {
   @override
   void dispose() {
     _focusNode.dispose();
+    _textCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    if (text.isNotEmpty) {
+      _textCtrl.text = text;
+      _textCtrl.selection =
+          TextSelection.collapsed(offset: text.length);
+    }
+    widget.onPaste?.call();
+  }
+
+  void _triggerAnalyze() {
+    final url = _textCtrl.text.trim();
+    if (url.isEmpty) {
+      showAppNotification(
+        context,
+        type: NotificationType.error,
+        message: 'Please paste a video URL first',
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      showAppNotification(
+        context,
+        type: NotificationType.error,
+        message: 'Invalid URL — must start with http:// or https://',
+        duration: const Duration(seconds: 3),
+      );
+      return;
+    }
+    widget.onAnalyze?.call(url);
   }
 
   @override
@@ -92,7 +129,9 @@ class _UrlInputBarState extends State<UrlInputBar> {
               Expanded(
                 child: TextField(
                   focusNode: _focusNode,
+                  controller: _textCtrl,
                   style: AppTextStyles.outfit(fontSize: widget.compact ? 12 : 13.5),
+                  onSubmitted: (_) => _triggerAnalyze(),
                   decoration: InputDecoration(
                     hintText: widget.placeholder,
                     hintStyle: AppTextStyles.outfit(
@@ -104,11 +143,11 @@ class _UrlInputBarState extends State<UrlInputBar> {
                 ),
               ),
               if (!widget.compact) ...[
-                _PasteButton(onTap: widget.onPaste),
+                _PasteButton(onTap: _pasteFromClipboard),
                 const SizedBox(width: 6),
               ],
               _AnalyzeButton(
-                onTap: widget.onAnalyze,
+                onTap: _triggerAnalyze,
                 compact: widget.compact,
               ),
             ],

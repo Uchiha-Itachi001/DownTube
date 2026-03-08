@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
-
-enum DownloadStatus { downloading, done, queued, error, paused }
+import '../models/download_item.dart';
 
 class DownloadItemTile extends StatelessWidget {
   final String title;

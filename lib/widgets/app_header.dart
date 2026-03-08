@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
+import '../providers/app_state.dart';
 import 'app_notification.dart';
 
 class AppHeader extends StatefulWidget {
@@ -12,6 +13,22 @@ class AppHeader extends StatefulWidget {
 
 class _AppHeaderState extends State<AppHeader> {
   bool _notifRunning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AppState.instance.addListener(_onEngineChange);
+  }
+
+  void _onEngineChange() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppState.instance.removeListener(_onEngineChange);
+    super.dispose();
+  }
 
   /// Shows each notification type, one at a time, 1.2 s apart.
   Future<void> _runNotifDemo() async {
@@ -64,35 +81,42 @@ class _AppHeaderState extends State<AppHeader> {
   }
 
   Widget _buildEnginePill() {
+    final ready = AppState.instance.ytDlpReady;
+    final version = AppState.instance.ytDlpVersion;
+    final label = ready ? 'Engine Ready' : 'Engine Offline';
+    final sub = ready
+        ? (version != null ? 'yt-dlp $version' : 'yt-dlp ready')
+        : 'yt-dlp not found';
+    final color = ready ? AppColors.green : AppColors.red;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.greenDim,
-        border: Border.all(color: AppColors.green.withOpacity(0.25)),
+        color: ready ? AppColors.greenDim : AppColors.red.withOpacity(0.08),
+        border: Border.all(color: color.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _PulsingDot(),
+          _PulsingDot(color: color),
           const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Engine Ready',
+                label,
                 style: AppTextStyles.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.green,
+                  color: color,
                 ),
               ),
               Text(
-                'yt-dlp v2026.03.03',
+                sub,
                 style: AppTextStyles.outfit(
                   fontSize: 10,
-                  color: AppColors.green.withOpacity(0.6),
+                  color: color.withOpacity(0.6),
                 ),
               ),
             ],
@@ -174,6 +198,8 @@ class _AppHeaderState extends State<AppHeader> {
 }
 
 class _PulsingDot extends StatefulWidget {
+  final Color color;
+  const _PulsingDot({this.color = AppColors.green});
   @override
   State<_PulsingDot> createState() => _PulsingDotState();
 }
@@ -214,11 +240,11 @@ class _PulsingDotState extends State<_PulsingDot>
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: AppColors.green,
+                color: widget.color,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.green,
+                    color: widget.color,
                     blurRadius: 8,
                   ),
                 ],

@@ -6,7 +6,7 @@ import '../core/app_text_styles.dart';
 import '../widgets/url_input_bar.dart';
 
 class DashboardScreen extends StatelessWidget {
-  final VoidCallback? onAnalyze;
+  final Function(String url)? onAnalyze;
 
   const DashboardScreen({super.key, this.onAnalyze});
 
@@ -211,7 +211,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _platformFaIcon(IconData icon, Color? bgColor, {Gradient? gradient}) {
+  Widget _platformFaIcon(IconData icon, Color? bgColor) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: Container(

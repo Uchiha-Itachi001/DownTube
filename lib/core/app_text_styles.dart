@@ -39,6 +39,40 @@ class AppTextStyles {
     );
   }
 
+  // Space Grotesk - quality badges, technical numbers, data labels
+  static TextStyle spaceGrotesk({
+    double fontSize = 14,
+    FontWeight fontWeight = FontWeight.w700,
+    Color color = AppColors.text,
+    double? height,
+    double? letterSpacing,
+  }) {
+    return GoogleFonts.spaceGrotesk(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      height: height,
+      letterSpacing: letterSpacing,
+    );
+  }
+
+  // JetBrains Mono - file sizes, bitrates, technical data values
+  static TextStyle mono({
+    double fontSize = 11,
+    FontWeight fontWeight = FontWeight.w500,
+    Color color = AppColors.text,
+    double? height,
+    double? letterSpacing,
+  }) {
+    return GoogleFonts.jetBrainsMono(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      height: height,
+      letterSpacing: letterSpacing,
+    );
+  }
+
   // Pre-built styles
   static TextStyle get heroTitle => syne(
         fontSize: 38,

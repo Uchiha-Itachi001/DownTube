@@ -1,12 +1,7 @@
-// Old imports preserved (disconnected from app):
-// import 'package:DownTube/loading_screen.dart';
-// import 'package:DownTube/download_screen.dart';
-// import 'package:DownTube/developer_screen.dart';
-
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'core/app_theme.dart';
-import 'shell/app_shell.dart';
+import 'startup/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +35,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'DownTube',
       theme: AppTheme.dark,
-      home: const AppShell(),
+      home: const SplashScreen(),
     );
   }
 }

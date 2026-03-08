@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
+import '../models/download_item.dart';
 import '../widgets/download_item_tile.dart';
 import '../widgets/section_card.dart';
 import '../widgets/sparkline_chart.dart';
@@ -251,7 +252,7 @@ class DownloadsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          UrlInputBar(compact: true, onAnalyze: () {}),
+          UrlInputBar(compact: true, onAnalyze: (_) {}),
         ],
       ),
     );
