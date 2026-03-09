@@ -7,6 +7,8 @@ class FormatInfo {
   final int? abr;
   final String? acodec;
   final String? vcodec;
+  final int? filesize;
+  final int? filesizeApprox;
 
   const FormatInfo({
     required this.formatId,
@@ -17,6 +19,8 @@ class FormatInfo {
     this.abr,
     this.acodec,
     this.vcodec,
+    this.filesize,
+    this.filesizeApprox,
   });
 
   factory FormatInfo.fromJson(Map<String, dynamic> j) => FormatInfo(
@@ -28,7 +32,12 @@ class FormatInfo {
     abr: (j['abr'] as num?)?.toInt(),
     acodec: j['acodec'] as String?,
     vcodec: j['vcodec'] as String?,
+    filesize: (j['filesize'] as num?)?.toInt(),
+    filesizeApprox: (j['filesize_approx'] as num?)?.toInt(),
   );
+
+  /// Actual or approximate file size in bytes, if available.
+  int? get knownSize => filesize ?? filesizeApprox;
 
   bool get hasVideo => vcodec != null && vcodec != 'none' && vcodec!.isNotEmpty;
   bool get hasAudio => acodec != null && acodec != 'none' && acodec!.isNotEmpty;
@@ -211,15 +220,20 @@ class VideoInfo {
       if (h >= 240) return estimatedSize('240p');
       return estimatedSize('144p');
     }
+
+    // Try to use actual format data from yt-dlp for more accurate sizes.
+    final sizeFromFormats = _estimateFromFormats(resolution);
+    if (sizeFromFormats != null) return _formatBytes(sizeFromFormats);
+
     final d = duration!;
     double mbps;
     switch (resolution) {
       case '4K':
-        mbps = 8.0; // VP9/AV1 4K
+        mbps = 8.0;
       case '1440p':
         mbps = 4.0;
       case '1080p':
-        mbps = 1.5; // VP9/AV1 1080p (was 3.5 AVC)
+        mbps = 1.5;
       case '720p':
         mbps = 0.8;
       case '480p':
@@ -244,5 +258,93 @@ class VideoInfo {
       return '~${(sizeMb / 1024).toStringAsFixed(1)} GB';
     }
     return '~${sizeMb.toStringAsFixed(0)} MB';
+  }
+
+  /// Try to calculate size from actual yt-dlp format metadata.
+  int? _estimateFromFormats(String resolution) {
+    int targetH;
+    switch (resolution) {
+      case '4K':
+        targetH = 2160;
+      case '1440p':
+        targetH = 1440;
+      case '1080p':
+        targetH = 1080;
+      case '720p':
+        targetH = 720;
+      case '480p':
+        targetH = 480;
+      case '360p':
+        targetH = 360;
+      case '240p':
+        targetH = 240;
+      case '144p':
+        targetH = 144;
+      default:
+        return null; // audio tiers handled by fallback
+    }
+
+    // Find video formats matching this height tier
+    final videoFormats = formats.where((f) =>
+        f.hasVideo &&
+        f.height != null && f.height! >= targetH - 30 && f.height! <= targetH + 30).toList();
+
+    if (videoFormats.isEmpty) return null;
+
+    // Sort by known size ascending so we pick the smallest (most likely what
+    // yt-dlp's bestvideo selector picks after filtering by height).
+    // yt-dlp typically selects the best codec at a given height which may be
+    // a smaller VP9/AV1 stream rather than a larger AVC one.
+    final withSize = videoFormats.where((f) => f.knownSize != null && f.knownSize! > 0).toList();
+    if (withSize.isNotEmpty) {
+      withSize.sort((a, b) => a.knownSize!.compareTo(b.knownSize!));
+      // Pick the smallest video-only stream (closest to what yt-dlp picks)
+      final audioSize = _bestAudioSize();
+      final best = withSize.first;
+      if (!best.hasAudio) {
+        return best.knownSize! + (audioSize ?? 0);
+      }
+      return best.knownSize!;
+    }
+
+    // Try using tbr (total bitrate in kbps) — pick lowest tbr for conservative estimate
+    final withTbr = videoFormats.where((f) => f.tbr != null && f.tbr! > 0).toList();
+    if (withTbr.isNotEmpty && duration != null) {
+      withTbr.sort((a, b) => a.tbr!.compareTo(b.tbr!));
+      final best = withTbr.first;
+      final videoBytes = (best.tbr! * 1000 / 8 * duration!).round();
+      if (!best.hasAudio) {
+        final audioSize = _bestAudioSize();
+        return videoBytes + (audioSize ?? 0);
+      }
+      return videoBytes;
+    }
+
+    return null;
+  }
+
+  /// Estimate the best audio stream size in bytes.
+  int? _bestAudioSize() {
+    if (duration == null) return null;
+    final audioFormats = formats.where((f) => f.hasAudio && !f.hasVideo);
+    for (final f in audioFormats) {
+      if (f.knownSize != null && f.knownSize! > 0) return f.knownSize!;
+    }
+    // Use actual abr if available
+    for (final f in audioFormats) {
+      if (f.abr != null && f.abr! > 0) {
+        return (f.abr! * 1000 / 8 * duration!).round();
+      }
+    }
+    // Default ~128kbps audio
+    return (128 * 1000 / 8 * duration!).round();
+  }
+
+  static String _formatBytes(int bytes) {
+    final mb = bytes / (1024 * 1024);
+    if (mb >= 1000) {
+      return '~${(mb / 1024).toStringAsFixed(1)} GB';
+    }
+    return '~${mb.toStringAsFixed(0)} MB';
   }
 }

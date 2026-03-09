@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:io';
+import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import '../models/download_item.dart';
@@ -6,6 +7,7 @@ import '../providers/app_state.dart';
 import '../widgets/section_card.dart';
 import '../widgets/stat_tile.dart';
 import '../widgets/sparkline_chart.dart';
+import '../widgets/app_notification.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -425,31 +427,48 @@ class _HistoryTileState extends State<_HistoryTile> {
   Future<void> _confirmDelete() async {
     final ok = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.6),
+      barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         child: Container(
-          width: 320,
-          padding: const EdgeInsets.all(22),
+          width: 340,
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: AppColors.surface1,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 40, spreadRadius: 2)
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Remove from History',
-                  style: AppTextStyles.outfit(
-                      fontSize: 15, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.red.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.red.withValues(alpha: 0.30)),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.red),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('Delete Download',
+                      style: AppTextStyles.outfit(
+                          fontSize: 15, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: 14),
               Text(
-                'Remove "${widget.item.title}" from history?\nThe file on disk is not affected.',
+                'Delete "${widget.item.title}"?\n\nThis will remove it from history . But the file on disk is not affected',
                 style: AppTextStyles.outfit(
                     fontSize: 13, color: AppColors.muted, height: 1.5),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -465,12 +484,12 @@ class _HistoryTileState extends State<_HistoryTile> {
                       backgroundColor: AppColors.red,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 9),
+                          horizontal: 20, vertical: 10),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: Text('Remove',
+                    child: Text('Delete',
                         style: AppTextStyles.outfit(
                             fontSize: 13, fontWeight: FontWeight.w600)),
                   ),
@@ -482,7 +501,15 @@ class _HistoryTileState extends State<_HistoryTile> {
       ),
     );
     if (ok == true && mounted) {
-      await AppState.instance.removeDownload(widget.item.id);
+      await AppState.instance.permanentlyDelete(widget.item.id);
+      if (mounted) {
+        showAppNotification(
+          context,
+          type: NotificationType.success,
+          message: 'Download deleted',
+          subtitle: 'Removed from history and deleted from PC',
+        );
+      }
     }
   }
 
@@ -495,7 +522,9 @@ class _HistoryTileState extends State<_HistoryTile> {
     final isAudio = item.resolution.endsWith('k');
     final accent = isAudio ? const Color(0xFF3B82F6) : AppColors.green;
 
-    return MouseRegion(
+    return GestureDetector(
+      onDoubleTap: success ? () => _openFile(item) : null,
+      child: MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
@@ -625,7 +654,14 @@ class _HistoryTileState extends State<_HistoryTile> {
           ],
         ),
       ),
+      ),
     );
+  }
+
+  void _openFile(DownloadItem item) {
+    final path = item.filePath.isNotEmpty ? item.filePath : item.outputPath;
+    if (path.isEmpty || !File(path).existsSync()) return;
+    Process.run('cmd', ['/c', 'start', '', path]);
   }
 
   Widget _fallbackThumb(Color accent, bool isAudio) {

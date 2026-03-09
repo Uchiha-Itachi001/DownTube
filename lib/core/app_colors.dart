@@ -26,7 +26,7 @@ class AppColors {
   // Text
   static const Color text = Color(0xFFF1F1F3);
   static const Color muted = Color(0xFF52525B);
-  static const Color muted2 = Color(0xFF3F3F46);
+  static const Color muted2 = Color.fromARGB(255, 108, 108, 119);
 
   // Radius
   static const double radius = 16.0;

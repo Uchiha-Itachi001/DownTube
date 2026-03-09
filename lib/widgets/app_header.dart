@@ -116,19 +116,7 @@ class _AppHeaderState extends State<AppHeader> {
   }
 
   Widget _buildIconButton(IconData icon, VoidCallback? onTap) {
-    return _HoverContainer(
-      onTap: onTap,
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(9),
-        ),
-        child: Icon(icon, size: 16, color: AppColors.muted),
-      ),
-    );
+    return _HamburgerButton(icon: icon, onTap: onTap);
   }
 
   Widget _buildRefreshButton() {
@@ -236,6 +224,62 @@ class _AppHeaderState extends State<AppHeader> {
   }
 }
 
+class _HamburgerButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  const _HamburgerButton({required this.icon, this.onTap});
+
+  @override
+  State<_HamburgerButton> createState() => _HamburgerButtonState();
+}
+
+class _HamburgerButtonState extends State<_HamburgerButton> {
+  bool _hov = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hov = true),
+      onExit: (_) => setState(() => _hov = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: _hov
+                ? AppColors.green.withOpacity(0.15)
+                : AppColors.green.withOpacity(0.08),
+            border: Border.all(
+              color: _hov
+                  ? AppColors.green.withOpacity(0.60)
+                  : AppColors.green.withOpacity(0.30),
+            ),
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: _hov
+                ? [
+                    BoxShadow(
+                      color: AppColors.green.withOpacity(0.25),
+                      blurRadius: 12,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            widget.icon,
+            size: 16,
+            color: _hov
+                ? AppColors.green
+                : AppColors.green.withOpacity(0.75),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PulsingDot extends StatefulWidget {
   final Color color;
   const _PulsingDot({this.color = AppColors.green});
@@ -324,8 +368,43 @@ class _HoverContainerState extends State<_HoverContainer> {
 
 // ── Download header button ────────────────────────────────────────────────────
 
-class _DownloadHeaderBtn extends StatelessWidget {
+class _DownloadHeaderBtn extends StatefulWidget {
   const _DownloadHeaderBtn();
+
+  @override
+  State<_DownloadHeaderBtn> createState() => _DownloadHeaderBtnState();
+}
+
+class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
+  bool _hovered = false;
+  OverlayEntry? _overlayEntry;
+  final LayerLink _layerLink = LayerLink();
+
+  void _showOverlay(List<DownloadItem> activeItems) {
+    _removeOverlay();
+    _overlayEntry = OverlayEntry(
+      builder: (_) => _DownloadOverlayPanel(
+        link: _layerLink,
+        activeItems: activeItems,
+        onExit: () {
+          _removeOverlay();
+          setState(() => _hovered = false);
+        },
+      ),
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -350,16 +429,55 @@ class _DownloadHeaderBtn extends StatelessWidget {
         final isActive = current != null;
         final pct =
             isActive ? (current!.progress * 100).clamp(0, 100).toInt() : 0;
-        final queuedCount =
+        final activeItems =
             downloads
                 .where(
                   (d) =>
                       d.status == DownloadStatus.downloading ||
                       d.status == DownloadStatus.queued,
                 )
-                .length;
+                .toList();
+        final queuedCount = activeItems.length;
 
-        return AnimatedContainer(
+        // Detect audio for main progress bar color
+        final bool currentIsAudio =
+            isActive && current!.resolution.endsWith('k');
+        final Color mainAccent =
+            currentIsAudio ? const Color(0xFF3B82F6) : AppColors.green;
+
+        // Update overlay when data changes
+        if (_hovered && queuedCount > 1 && _overlayEntry != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _overlayEntry?.markNeedsBuild();
+          });
+        }
+        // Remove overlay when no longer relevant
+        if (_overlayEntry != null && queuedCount <= 1) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _removeOverlay();
+          });
+        }
+
+        return CompositedTransformTarget(
+          link: _layerLink,
+          child: MouseRegion(
+            onEnter: (_) {
+              setState(() => _hovered = true);
+              if (queuedCount > 1) {
+                _showOverlay(activeItems);
+              }
+            },
+            onExit: (_) {
+              // Small delay to allow moving to the overlay panel
+              Future.delayed(const Duration(milliseconds: 100), () {
+                if (!_hovered || !mounted) return;
+                // Will be cancelled if mouse enters overlay
+              });
+              setState(() => _hovered = false);
+              _removeOverlay();
+            },
+            child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
           height: 36,
@@ -370,7 +488,7 @@ class _DownloadHeaderBtn extends StatelessWidget {
             border: Border.all(
               color:
                   isActive
-                      ? AppColors.green.withOpacity(0.40)
+                      ? mainAccent.withOpacity(0.40)
                       : AppColors.border,
             ),
             borderRadius: BorderRadius.circular(9),
@@ -388,7 +506,7 @@ class _DownloadHeaderBtn extends StatelessWidget {
                       child: Icon(
                         Icons.download_rounded,
                         size: 16,
-                        color: isActive ? AppColors.green : AppColors.muted,
+                        color: isActive ? mainAccent : AppColors.muted,
                       ),
                     ),
                     if (queuedCount > 0)
@@ -405,7 +523,7 @@ class _DownloadHeaderBtn extends StatelessWidget {
                             minHeight: 14,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.green,
+                            color: mainAccent,
                             borderRadius: BorderRadius.circular(7),
                             border: Border.all(
                               color: AppColors.surface2,
@@ -467,7 +585,7 @@ class _DownloadHeaderBtn extends StatelessWidget {
                                           style: AppTextStyles.outfit(
                                             fontSize: 10,
                                             fontWeight: FontWeight.w700,
-                                            color: AppColors.green,
+                                            color: mainAccent,
                                           ),
                                         ),
                                         if (queuedCount > 1) ...[
@@ -478,7 +596,7 @@ class _DownloadHeaderBtn extends StatelessWidget {
                                               vertical: 1,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: AppColors.green
+                                              color: mainAccent
                                                   .withOpacity(0.15),
                                               borderRadius:
                                                   BorderRadius.circular(4),
@@ -488,7 +606,7 @@ class _DownloadHeaderBtn extends StatelessWidget {
                                               style: AppTextStyles.outfit(
                                                 fontSize: 8,
                                                 fontWeight: FontWeight.w700,
-                                                color: AppColors.green,
+                                                color: mainAccent,
                                               ),
                                             ),
                                           ),
@@ -517,8 +635,8 @@ class _DownloadHeaderBtn extends StatelessWidget {
                                                   .surface2
                                                   .withOpacity(0.6),
                                               valueColor:
-                                                  const AlwaysStoppedAnimation(
-                                                    AppColors.green,
+                                                  AlwaysStoppedAnimation(
+                                                    mainAccent,
                                                   ),
                                               minHeight: 3,
                                             ),
@@ -534,8 +652,152 @@ class _DownloadHeaderBtn extends StatelessWidget {
               ),
             ],
           ),
+            ),
+          ),
         );
       },
+    );
+  }
+}
+
+/// Overlay panel showing all active downloads — renders above all other widgets.
+class _DownloadOverlayPanel extends StatefulWidget {
+  final LayerLink link;
+  final List<DownloadItem> activeItems;
+  final VoidCallback onExit;
+
+  const _DownloadOverlayPanel({
+    required this.link,
+    required this.activeItems,
+    required this.onExit,
+  });
+
+  @override
+  State<_DownloadOverlayPanel> createState() => _DownloadOverlayPanelState();
+}
+
+class _DownloadOverlayPanelState extends State<_DownloadOverlayPanel> {
+  bool _insidePanel = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformFollower(
+      link: widget.link,
+      targetAnchor: Alignment.bottomRight,
+      followerAnchor: Alignment.topRight,
+      offset: const Offset(0, 4),
+      child: MouseRegion(
+        onEnter: (_) => _insidePanel = true,
+        onExit: (_) {
+          _insidePanel = false;
+          widget.onExit();
+        },
+        child: ListenableBuilder(
+          listenable: AppState.instance,
+          builder: (_, __) {
+            final activeItems = AppState.instance.downloads
+                .where((d) =>
+                    d.status == DownloadStatus.downloading ||
+                    d.status == DownloadStatus.queued)
+                .toList();
+            if (activeItems.isEmpty) return const SizedBox.shrink();
+            return Material(
+              color: Colors.transparent,
+              child: Container(
+                width: 250,
+                constraints: const BoxConstraints(minHeight: 72, maxHeight: 144),
+                decoration: BoxDecoration(
+                  color: AppColors.surface1,
+                  border:
+                      Border.all(color: AppColors.green.withOpacity(0.25)),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.45),
+                      blurRadius: 24,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: activeItems.map((d) {
+                        final dp =
+                            (d.progress * 100).clamp(0, 100).toInt();
+                        final isAudio = d.resolution.endsWith('k');
+                        final accent = isAudio
+                            ? const Color(0xFF3B82F6)
+                            : AppColors.green;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    d.status == DownloadStatus.queued
+                                        ? Icons.hourglass_top_rounded
+                                        : Icons.download_rounded,
+                                    size: 12,
+                                    color:
+                                        d.status == DownloadStatus.queued
+                                            ? const Color(0xFFEAB308)
+                                            : accent,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      d.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTextStyles.outfit(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.text,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '$dp%',
+                                    style: AppTextStyles.outfit(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: accent,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(2),
+                                child: LinearProgressIndicator(
+                                  value: d.progress.clamp(0.0, 1.0),
+                                  backgroundColor:
+                                      AppColors.surface2.withOpacity(0.6),
+                                  valueColor:
+                                      AlwaysStoppedAnimation(accent),
+                                  minHeight: 3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 }

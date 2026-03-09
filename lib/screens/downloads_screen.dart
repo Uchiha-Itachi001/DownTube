@@ -1,9 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import '../models/download_item.dart';
 import '../providers/app_state.dart';
-import '../widgets/app_notification.dart';
 import '../widgets/download_item_tile.dart';
 import '../widgets/section_card.dart';
 import '../widgets/sparkline_chart.dart';
@@ -11,7 +11,8 @@ import '../widgets/stat_tile.dart';
 import '../widgets/url_input_bar.dart';
 
 class DownloadsScreen extends StatefulWidget {
-  const DownloadsScreen({super.key});
+  final Function(String url)? onAnalyze;
+  const DownloadsScreen({super.key, this.onAnalyze});
 
   @override
   State<DownloadsScreen> createState() => _DownloadsScreenState();
@@ -20,39 +21,7 @@ class DownloadsScreen extends StatefulWidget {
 class _DownloadsScreenState extends State<DownloadsScreen> {
   String _completedFilter = 'all';
 
-  @override
-  void initState() {
-    super.initState();
-    AppState.instance.addListener(_onAppChange);
-  }
 
-  @override
-  void dispose() {
-    AppState.instance.removeListener(_onAppChange);
-    super.dispose();
-  }
-
-  void _onAppChange() {
-    final notifs = AppState.instance.drainNotifications();
-    if (notifs.isEmpty) return;
-    for (final n in notifs) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final (type, icon) = switch (n.type) {
-          DownloadNotifType.videoPhase => (NotificationType.info, null),
-          DownloadNotifType.audioPhase => (NotificationType.info, null),
-          DownloadNotifType.mergeDone => (NotificationType.success, null),
-        };
-        showAppNotification(
-          context,
-          type: type,
-          message: n.message,
-          subtitle: n.subtitle,
-          duration: const Duration(seconds: 3),
-        );
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -432,7 +401,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             ),
           ),
           const SizedBox(height: 10),
-          UrlInputBar(compact: true, onAnalyze: (_) {}),
+          UrlInputBar(compact: true, onAnalyze: (url) => widget.onAnalyze?.call(url)),
         ],
       ),
     );
@@ -547,7 +516,11 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
     final (phaseLabel, phaseIcon, phaseColor) = _phaseInfo;
     final pct = (item.progress * 100).clamp(0, 100).toInt();
 
-    return MouseRegion(
+    final isDone = item.status == DownloadStatus.done;
+
+    return GestureDetector(
+      onDoubleTap: isDone ? () => _openFile(item) : null,
+      child: MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -672,22 +645,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                             color: AppColors.muted2,
                           ),
                         ),
-                        if (item.fileSize != null) ...[
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.data_usage_rounded,
-                            size: 10,
-                            color: AppColors.muted2,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            item.fileSize!,
-                            style: AppTextStyles.outfit(
-                              fontSize: 10,
-                              color: AppColors.muted2,
-                            ),
-                          ),
-                        ],
+                        
                         if (item.eta != null) ...[
                           const SizedBox(width: 8),
                           Icon(
@@ -703,6 +661,22 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                               color: AppColors.muted2,
                             ),
                           ),
+                          if (item.fileSize != null) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.data_usage_rounded,
+                            size: 10,
+                            color: AppColors.muted2,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            item.fileSize!,
+                            style: AppTextStyles.outfit(
+                              fontSize: 10,
+                              color: AppColors.muted2,
+                            ),
+                          ),
+                        ],
                         ],
                       ],
                     ),
@@ -731,7 +705,14 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
           ],
         ),
       ),
+      ),
     );
+  }
+
+  void _openFile(DownloadItem item) {
+    final path = item.filePath.isNotEmpty ? item.filePath : item.outputPath;
+    if (path.isEmpty || !File(path).existsSync()) return;
+    Process.run('cmd', ['/c', 'start', '', path]);
   }
 
   List<Widget> _buildCompletedActions() => [

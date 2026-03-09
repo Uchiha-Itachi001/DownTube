@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
+import '../models/download_item.dart';
+import '../providers/app_state.dart';
 import '../widgets/toggle_switch.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -41,7 +44,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _defaultFormat = 'MP4';
   String _defaultAudioFormat = 'MP3';
   String _audioBitrate = '320 kbps';
-  String _savePath = 'D:\\Downloads\\TubeDown';
 
   @override
   Widget build(BuildContext context) {
@@ -91,34 +93,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
             final isActive = _selectedNav == i;
             final isReset = i == _navItems.length - 1;
             return Padding(
-              padding: EdgeInsets.only(
-                bottom: 2,
-                top: isReset ? 8 : 0,
-              ),
+              padding: EdgeInsets.only(bottom: 2, top: isReset ? 8 : 0),
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: GestureDetector(
                   onTap: () => setState(() => _selectedNav = i),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color:
-                          isActive ? AppColors.greenDim : Colors.transparent,
+                      color: isActive ? AppColors.greenDim : Colors.transparent,
                       borderRadius: BorderRadius.circular(9),
-                      border: isActive
-                          ? Border.all(color: AppColors.green.withOpacity(0.15))
-                          : null,
+                      border:
+                          isActive
+                              ? Border.all(
+                                color: AppColors.green.withOpacity(0.15),
+                              )
+                              : null,
                     ),
                     child: Row(
                       children: [
                         Icon(
                           _navItems[i].icon,
                           size: 16,
-                          color: isReset && !isActive
-                              ? AppColors.red.withOpacity(0.7)
-                              : isActive
+                          color:
+                              isReset && !isActive
+                                  ? AppColors.red.withOpacity(0.7)
+                                  : isActive
                                   ? AppColors.green
                                   : AppColors.muted,
                         ),
@@ -129,9 +133,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             fontSize: 13,
                             fontWeight:
                                 isActive ? FontWeight.w600 : FontWeight.w400,
-                            color: isReset && !isActive
-                                ? AppColors.red.withOpacity(0.7)
-                                : isActive
+                            color:
+                                isReset && !isActive
+                                    ? AppColors.red.withOpacity(0.7)
+                                    : isActive
                                     ? AppColors.green
                                     : AppColors.muted,
                           ),
@@ -162,9 +167,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildStorageUsage() {
-    const used = 42.8;
-    const total = 120.0;
-    const fraction = used / total;
+    final totalBytes = AppState.instance.totalStorageBytes;
+    final label = AppState.formatBytes(totalBytes);
+    final count =
+        AppState.instance.downloads
+            .where((d) => d.status == DownloadStatus.done)
+            .length;
     return Container(
       margin: const EdgeInsets.all(6),
       padding: const EdgeInsets.all(12),
@@ -191,39 +199,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: SizedBox(
-              height: 5,
-              child: Stack(
-                children: [
-                  Container(color: Colors.white.withOpacity(0.05)),
-                  FractionallySizedBox(
-                    widthFactor: fraction,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            AppColors.green,
-                            AppColors.green.withOpacity(0.6),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
           Text(
-            '${used.toStringAsFixed(1)} / ${total.toStringAsFixed(0)} GB',
+            label,
             style: AppTextStyles.outfit(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
               color: AppColors.text,
             ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '$count downloads',
+            style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted),
           ),
         ],
       ),
@@ -275,7 +262,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Text(
               item.label,
-              style: AppTextStyles.syne(fontSize: 16, fontWeight: FontWeight.w700),
+              style: AppTextStyles.syne(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             Text(
               _sectionDescription(),
@@ -378,21 +368,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Default Quality',
           'Preferred video quality for downloads',
           icon: Icons.high_quality_rounded,
-          trailing: _dropdown(
-            _defaultQuality,
-            ['4K', '1080p', '720p', '480p', '360p'],
-            (v) => setState(() => _defaultQuality = v),
-          ),
+          trailing: _dropdown(_defaultQuality, [
+            '4K',
+            '1080p',
+            '720p',
+            '480p',
+            '360p',
+          ], (v) => setState(() => _defaultQuality = v)),
         ),
         _settingRow(
           'Default Format',
           'Preferred output container format',
           icon: Icons.video_file_rounded,
-          trailing: _dropdown(
-            _defaultFormat,
-            ['MP4', 'MKV', 'WEBM'],
-            (v) => setState(() => _defaultFormat = v),
-          ),
+          trailing: _dropdown(_defaultFormat, [
+            'MP4',
+            'MKV',
+            'WEBM',
+          ], (v) => setState(() => _defaultFormat = v)),
         ),
       ],
     );
@@ -406,21 +398,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Audio Format',
           'Preferred audio extraction format',
           icon: Icons.audio_file_rounded,
-          trailing: _dropdown(
-            _defaultAudioFormat,
-            ['MP3', 'FLAC', 'WAV', 'AAC', 'OGG'],
-            (v) => setState(() => _defaultAudioFormat = v),
-          ),
+          trailing: _dropdown(_defaultAudioFormat, [
+            'MP3',
+            'FLAC',
+            'WAV',
+            'AAC',
+            'OGG',
+          ], (v) => setState(() => _defaultAudioFormat = v)),
         ),
         _settingRow(
           'Bitrate',
           'Audio quality bitrate',
           icon: Icons.graphic_eq_rounded,
-          trailing: _dropdown(
-            _audioBitrate,
-            ['128 kbps', '192 kbps', '256 kbps', '320 kbps'],
-            (v) => setState(() => _audioBitrate = v),
-          ),
+          trailing: _dropdown(_audioBitrate, [
+            '128 kbps',
+            '192 kbps',
+            '256 kbps',
+            '320 kbps',
+          ], (v) => setState(() => _audioBitrate = v)),
         ),
       ],
     );
@@ -443,6 +438,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildStorageBreakdown() {
+    final videoBytes = AppState.instance.videoStorageBytes;
+    final audioBytes = AppState.instance.audioStorageBytes;
+    final totalBytes = AppState.instance.totalStorageBytes;
+    // "Other" is anything not categorized (currently none, but left for future)
+    final otherBytes = totalBytes - videoBytes - audioBytes;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -453,30 +453,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'STORAGE BREAKDOWN',
-            style: AppTextStyles.outfit(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.muted,
-              letterSpacing: 1.2,
-            ),
+          Row(
+            children: [
+              Text(
+                'STORAGE BREAKDOWN',
+                style: AppTextStyles.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                AppState.formatBytes(totalBytes),
+                style: AppTextStyles.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.green,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
-          _storageItem('Videos', 34.2, AppColors.green),
+          _storageItem('Videos', videoBytes, totalBytes, AppColors.green),
           const SizedBox(height: 8),
-          _storageItem('Audio', 6.4, const Color(0xFF3B82F6)),
-          const SizedBox(height: 8),
-          _storageItem('Thumbnails', 1.8, AppColors.yellow),
-          const SizedBox(height: 8),
-          _storageItem('Other', 0.4, AppColors.muted),
+          _storageItem(
+            'Audio',
+            audioBytes,
+            totalBytes,
+            const Color(0xFF3B82F6),
+          ),
+          if (otherBytes > 0) ...[
+            const SizedBox(height: 8),
+            _storageItem('Other', otherBytes, totalBytes, AppColors.muted),
+          ],
         ],
       ),
     );
   }
 
-  Widget _storageItem(String label, double gb, Color color) {
-    const total = 120.0;
+  Widget _storageItem(String label, int bytes, int totalBytes, Color color) {
+    final fraction =
+        totalBytes > 0 ? (bytes / totalBytes).clamp(0.0, 1.0) : 0.0;
     return Row(
       children: [
         Container(
@@ -492,7 +511,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         Text(
-          '${gb.toStringAsFixed(1)} GB',
+          AppState.formatBytes(bytes),
           style: AppTextStyles.outfit(
             fontSize: 12,
             fontWeight: FontWeight.w500,
@@ -509,7 +528,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Container(color: Colors.white.withOpacity(0.05)),
                 FractionallySizedBox(
-                  widthFactor: (gb / total).clamp(0.0, 1.0),
+                  widthFactor: fraction,
                   child: Container(
                     decoration: BoxDecoration(
                       color: color,
@@ -608,7 +627,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           Text(
             'No account linked',
-            style: AppTextStyles.outfit(fontSize: 14, fontWeight: FontWeight.w500),
+            style: AppTextStyles.outfit(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -666,46 +688,213 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
           ),
           const SizedBox(height: 16),
-          _dangerButton('Reset All Settings', Icons.settings_backup_restore_rounded),
+          _dangerButton(
+            'Reset All Settings',
+            Icons.settings_backup_restore_rounded,
+            () {
+              _showConfirmDialog(
+                title: 'Reset All Settings',
+                message:
+                    'This will reset all preferences to default values. This action cannot be undone.',
+                onConfirm: () {
+                  // Reset settings to defaults
+                  Navigator.of(context).pop();
+                },
+              );
+            },
+          ),
           const SizedBox(height: 8),
-          _dangerButton('Clear Download History', Icons.delete_sweep_rounded),
+          _dangerButton('Clear Download History', Icons.delete_sweep_rounded, () {
+            _showConfirmDialog(
+              title: 'Clear Download History',
+              message:
+                  'This will permanently remove all download records from the database. Downloaded files on disk will not be deleted.',
+              onConfirm: () async {
+                await AppState.instance.clearHistory();
+                if (mounted) Navigator.of(context).pop();
+              },
+            );
+          }),
           const SizedBox(height: 8),
-          _dangerButton('Clear Cache', Icons.cleaning_services_rounded),
+          _dangerButton('Clear Cache', Icons.cleaning_services_rounded, () {
+            _showConfirmDialog(
+              title: 'Clear Cache',
+              message:
+                  'This will remove download records for files that no longer exist on disk. Active downloads will not be affected.',
+              onConfirm: () async {
+                final removed = await AppState.instance.cleanMissingFiles();
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        removed > 0
+                            ? 'Removed $removed stale record${removed > 1 ? 's' : ''}'
+                            : 'No stale records found',
+                        style: const TextStyle(fontFamily: 'Outfit'),
+                      ),
+                      backgroundColor: AppColors.surface2,
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              },
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _dangerButton(String label, IconData icon) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          border: Border.all(color: AppColors.red.withOpacity(0.2)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 16, color: AppColors.red.withOpacity(0.7)),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: AppTextStyles.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppColors.red.withOpacity(0.8),
+  Widget _dangerButton(String label, IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            border: Border.all(color: AppColors.red.withOpacity(0.2)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: AppColors.red.withOpacity(0.7)),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: AppTextStyles.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.red.withOpacity(0.8),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _settingRow(String title, String subtitle,
-      {required Widget trailing, IconData? icon}) {
+  void _showConfirmDialog({
+    required String title,
+    required String message,
+    required VoidCallback onConfirm,
+  }) {
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => Dialog(
+            backgroundColor: AppColors.surface1,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(color: AppColors.red.withOpacity(0.25)),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: 22,
+                          color: AppColors.red,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          title,
+                          style: AppTextStyles.syne(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      message,
+                      style: AppTextStyles.outfit(
+                        fontSize: 13,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 22),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.of(ctx).pop(),
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 9,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: AppColors.border),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Cancel',
+                                style: AppTextStyles.outfit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        GestureDetector(
+                          onTap: onConfirm,
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 9,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.red,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Confirm',
+                                style: AppTextStyles.outfit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+    );
+  }
+
+  Widget _settingRow(
+    String title,
+    String subtitle, {
+    required Widget trailing,
+    IconData? icon,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Container(
@@ -736,7 +925,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text(
                     subtitle,
                     style: AppTextStyles.outfit(
-                        fontSize: 11.5, color: AppColors.muted),
+                      fontSize: 11.5,
+                      color: AppColors.muted,
+                    ),
                   ),
                 ],
               ),
@@ -749,7 +940,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _dropdown(
-      String value, List<String> items, ValueChanged<String> onChanged) {
+    String value,
+    List<String> items,
+    ValueChanged<String> onChanged,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       height: 32,
@@ -762,12 +956,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: DropdownButton<String>(
           value: value,
           dropdownColor: AppColors.surface2,
-          style: AppTextStyles.outfit(fontSize: 12, fontWeight: FontWeight.w500),
-          icon: const Icon(Icons.arrow_drop_down_rounded,
-              size: 18, color: AppColors.muted),
-          items: items
-              .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-              .toList(),
+          style: AppTextStyles.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+          icon: const Icon(
+            Icons.arrow_drop_down_rounded,
+            size: 18,
+            color: AppColors.muted,
+          ),
+          items:
+              items
+                  .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                  .toList(),
           onChanged: (v) {
             if (v != null) onChanged(v);
           },
@@ -795,7 +996,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             alignment: Alignment.center,
             child: Text(
               '$value',
-              style: AppTextStyles.outfit(fontSize: 13, fontWeight: FontWeight.w600),
+              style: AppTextStyles.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           _stepperBtn(Icons.add_rounded, () {
@@ -820,38 +1024,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _pathInput() {
-    return Container(
-      width: 240,
-      height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surface3,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              _savePath,
-              style: AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
-              overflow: TextOverflow.ellipsis,
-            ),
+    final currentPath = AppState.instance.downloadPath ?? 'Not set';
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () async {
+          final picked = await FilePicker.platform.getDirectoryPath();
+          if (picked != null) {
+            await AppState.instance.setDownloadPath(picked);
+            setState(() {});
+          }
+        },
+        child: Container(
+          width: 240,
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface3,
+            border: Border.all(color: AppColors.green, width: .5),
+            borderRadius: BorderRadius.circular(8),
           ),
-          MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: GestureDetector(
-              onTap: () {
-                // File picker would go here in functionality phase
-              },
-              child: const Icon(
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  currentPath,
+                  style: AppTextStyles.outfit(
+                    fontSize: 12,
+                    color: AppColors.green.withOpacity(0.7),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Icon(
                 Icons.folder_open_rounded,
                 size: 16,
-                color: AppColors.muted,
+                color: AppColors.green,
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

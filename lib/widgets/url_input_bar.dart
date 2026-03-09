@@ -79,6 +79,7 @@ class _UrlInputBarState extends State<UrlInputBar> {
       return;
     }
     widget.onAnalyze?.call(url);
+    _textCtrl.clear();
   }
 
   @override
@@ -143,6 +144,7 @@ class _UrlInputBarState extends State<UrlInputBar> {
                 ),
               ),
               if (!widget.compact) ...[
+                const SizedBox(width: 10),
                 _PasteButton(onTap: _pasteFromClipboard),
                 const SizedBox(width: 6),
               ],
@@ -185,20 +187,31 @@ class _PasteButtonState extends State<_PasteButton> {
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         onTap: widget.onTap,
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.surface3,
-            border: Border.all(color: AppColors.border),
+            color: _hovered ? AppColors.green.withOpacity(0.08) : Colors.transparent,
+            border: Border.all(
+              color: _hovered ? AppColors.green : AppColors.green.withOpacity(0.40),
+            ),
             borderRadius: BorderRadius.circular(9),
           ),
-          child: Text(
-            'Paste',
-            style: AppTextStyles.outfit(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: _hovered ? AppColors.text : AppColors.muted,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.content_paste_rounded, size: 12,
+                  color: _hovered ? AppColors.green : AppColors.green.withOpacity(0.7)),
+              const SizedBox(width: 5),
+              Text(
+                'Paste',
+                style: AppTextStyles.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _hovered ? AppColors.green : AppColors.green.withOpacity(0.7),
+                ),
+              ),
+            ],
           ),
         ),
       ),

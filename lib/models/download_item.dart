@@ -36,6 +36,23 @@ class DownloadItem {
   /// Video duration in seconds from VideoInfo (set at enqueue time).
   int? videoDuration;
 
+  /// Parse [fileSize] string to bytes. Returns 0 if unavailable.
+  int get fileSizeBytes {
+    if (fileSize == null || fileSize!.isEmpty) return 0;
+    final m = RegExp(r'([\d.]+)\s*(K|M|G|T)?i?B', caseSensitive: false)
+        .firstMatch(fileSize!);
+    if (m == null) return 0;
+    final val = double.tryParse(m.group(1)!) ?? 0;
+    final unit = (m.group(2) ?? '').toUpperCase();
+    return switch (unit) {
+      'T' => (val * 1024 * 1024 * 1024 * 1024).round(),
+      'G' => (val * 1024 * 1024 * 1024).round(),
+      'M' => (val * 1024 * 1024).round(),
+      'K' => (val * 1024).round(),
+      _ => val.round(),
+    };
+  }
+
   DownloadItem({
     String? id,
     required this.title,

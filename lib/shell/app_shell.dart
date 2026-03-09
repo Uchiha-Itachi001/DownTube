@@ -3,6 +3,7 @@ import '../core/app_colors.dart';
 import '../providers/app_state.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/app_header.dart';
+import '../widgets/app_notification.dart';
 import '../screens/dashboard_screen.dart';
 import '../screens/analyzed_screen.dart';
 import '../screens/downloads_screen.dart';
@@ -61,12 +62,36 @@ class _AppShellState extends State<AppShell>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
+    AppState.instance.addListener(_drainNotifications);
   }
 
   @override
   void dispose() {
+    AppState.instance.removeListener(_drainNotifications);
     _refreshSpinCtrl.dispose();
     super.dispose();
+  }
+
+  void _drainNotifications() {
+    final notifs = AppState.instance.drainNotifications();
+    if (notifs.isEmpty) return;
+    for (final n in notifs) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final (type, icon) = switch (n.type) {
+          DownloadNotifType.videoPhase => (NotificationType.info, null),
+          DownloadNotifType.audioPhase => (NotificationType.info, null),
+          DownloadNotifType.mergeDone => (NotificationType.success, null),
+        };
+        showAppNotification(
+          context,
+          type: type,
+          message: n.message,
+          subtitle: n.subtitle,
+          duration: const Duration(seconds: 3),
+        );
+      });
+    }
   }
 
   Widget _buildNonAnalyzeScreen() {
@@ -76,7 +101,7 @@ class _AppShellState extends State<AppShell>
       case 1:
         return const LibraryScreen();
       case 2:
-        return const DownloadsScreen();
+        return DownloadsScreen(onAnalyze: _goToAnalyzed);
       case 3:
         return const HistoryScreen();
       case 4:
@@ -96,7 +121,11 @@ class _AppShellState extends State<AppShell>
         elevation: 0,
         width: 280,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppColors.gap),
+          padding: const EdgeInsets.only(
+            top: AppColors.gap,
+            bottom: AppColors.gap,
+            left: 8,
+          ),
           child: Sidebar(
             selectedIndex: _selectedIndex,
             onItemSelected: (i) {
@@ -191,44 +220,41 @@ class _AppShellState extends State<AppShell>
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
-                              // Screens 0–4: swapped via AnimatedSwitcher with slide
-                              Offstage(
-                                offstage: _selectedIndex == 5,
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 280),
-                                  switchInCurve: Curves.easeOutCubic,
-                                  switchOutCurve: Curves.easeInCubic,
-                                  transitionBuilder: (child, animation) {
-                                    final slide = Tween<Offset>(
-                                      begin: const Offset(0.04, 0),
-                                      end: Offset.zero,
-                                    ).animate(animation);
-                                    return FadeTransition(
-                                      opacity: animation,
-                                      child: SlideTransition(
-                                        position: slide,
-                                        child: child,
-                                      ),
-                                    );
-                                  },
-                                  child: KeyedSubtree(
-                                    key: ValueKey(
-                                      '${_selectedIndex < 5 ? _selectedIndex : 0}-$_screenRefreshKey',
+                              // All screens (0–5) unified via AnimatedSwitcher
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                transitionBuilder: (child, animation) {
+                                  final slide = Tween<Offset>(
+                                    begin: const Offset(0.04, 0),
+                                    end: Offset.zero,
+                                  ).animate(animation);
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: SlideTransition(
+                                      position: slide,
+                                      child: child,
                                     ),
-                                    child: _buildNonAnalyzeScreen(),
-                                  ),
-                                ),
+                                  );
+                                },
+                                child: _selectedIndex == 5 && _pendingUrl != null
+                                    ? KeyedSubtree(
+                                        key: ValueKey('analyze-$_pendingUrl-$_fetchKey'),
+                                        child: AnalyzedScreen(
+                                          key: ValueKey('$_pendingUrl-$_fetchKey'),
+                                          initialUrl: _pendingUrl,
+                                          onDownload: () => _onNavSelected(2),
+                                          onQueue: () => _onNavSelected(0),
+                                        ),
+                                      )
+                                    : KeyedSubtree(
+                                        key: ValueKey(
+                                          'nav-${_selectedIndex < 5 ? _selectedIndex : 0}-$_screenRefreshKey',
+                                        ),
+                                        child: _buildNonAnalyzeScreen(),
+                                      ),
                               ),
-                              // Analyze screen — kept alive in the widget tree
-                              if (_pendingUrl != null)
-                                Offstage(
-                                  offstage: _selectedIndex != 5,
-                                  child: AnalyzedScreen(
-                                    key: ValueKey('$_pendingUrl-$_fetchKey'),
-                                    initialUrl: _pendingUrl,
-                                    onDownload: () => _onNavSelected(2),
-                                  ),
-                                ),
                               // ── Refresh overlay ──────────────────────────────
                               if (_isRefreshing)
                                 Positioned.fill(
@@ -328,7 +354,6 @@ class _LogoBox extends StatelessWidget {
                   ),
                 )
                 : Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       width: 32,

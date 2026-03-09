@@ -1,9 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import '../models/download_item.dart';
 import '../providers/app_state.dart';
 import '../widgets/library_card.dart';
+import '../widgets/app_notification.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -281,17 +283,171 @@ class _LibraryScreenState extends State<LibraryScreen> {
       itemBuilder: (context, i) {
         final item = items[i];
         final isAudio = item.resolution.endsWith('k');
-        return LibraryCard(
-          title: item.title,
-          meta: '${item.resolution} · ${item.format}',
-          duration: item.formattedDuration,
-          size: item.fileSize ?? '—',
-          isAudio: isAudio,
-          thumbnailUrl: item.thumbnailUrl,
-          outputPath:
-              item.filePath.isNotEmpty ? item.filePath : item.outputPath,
+        return Stack(
+          children: [
+            LibraryCard(
+              title: item.title,
+              meta: '${item.resolution} · ${item.format}',
+              duration: item.formattedDuration,
+              size: item.fileSize ?? '—',
+              isAudio: isAudio,
+              thumbnailUrl: item.thumbnailUrl,
+              outputPath:
+                  item.filePath.isNotEmpty ? item.filePath : item.outputPath,
+              onDoubleTap: () => _openFile(item),
+            ),
+            // Delete button — top-right
+            Positioned(
+              top: 16,
+              right: 8,
+              child: _DeleteBtn(
+                onDelete: () => _confirmDelete(item),
+              ),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  void _openFile(DownloadItem item) {
+    final path = item.filePath.isNotEmpty ? item.filePath : item.outputPath;
+    if (path.isEmpty || !File(path).existsSync()) return;
+    Process.run('cmd', ['/c', 'start', '', path]);
+  }
+
+  Future<void> _confirmDelete(DownloadItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 340,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 40, spreadRadius: 2)
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.red.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.red.withValues(alpha: 0.30)),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.red),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('Delete Download',
+                      style: AppTextStyles.outfit(
+                          fontSize: 15, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Delete "${item.title}"?\n\nThis will remove it from your library.But the file on disk is not affected',
+                style: AppTextStyles.outfit(
+                    fontSize: 13, color: AppColors.muted, height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text('Cancel',
+                        style: AppTextStyles.outfit(fontSize: 13, color: AppColors.muted)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text('Delete',
+                        style: AppTextStyles.outfit(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await AppState.instance.permanentlyDelete(item.id);
+      if (mounted) {
+        showAppNotification(
+          context,
+          type: NotificationType.success,
+          message: 'Deleted successfully',
+          subtitle: item.title,
+          duration: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+}
+
+class _DeleteBtn extends StatefulWidget {
+  final VoidCallback onDelete;
+  const _DeleteBtn({required this.onDelete});
+
+  @override
+  State<_DeleteBtn> createState() => _DeleteBtnState();
+}
+
+class _DeleteBtnState extends State<_DeleteBtn> {
+  bool _hov = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hov = true),
+      onExit: (_) => setState(() => _hov = false),
+      child: GestureDetector(
+        onTap: widget.onDelete,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: _hov
+                ? AppColors.red.withOpacity(0.20)
+                : Colors.black.withOpacity(0.60),
+            border: Border.all(
+              color: _hov
+                  ? AppColors.red.withOpacity(0.60)
+                  : Colors.white.withOpacity(0.15),
+            ),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Center(
+            child: Icon(
+              Icons.delete_outline_rounded,
+              size: 14,
+              color: _hov ? AppColors.red : Colors.white.withOpacity(0.6),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

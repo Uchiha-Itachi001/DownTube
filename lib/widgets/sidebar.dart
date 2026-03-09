@@ -55,7 +55,7 @@ class Sidebar extends StatelessWidget {
                 ),
               ),
             ),
-            // Nav content
+            // Nav content — clipped to prevent any overflow warnings
             Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: collapsed ? 8 : 12,
@@ -71,69 +71,86 @@ class Sidebar extends StatelessWidget {
                     const SizedBox(height: 4),
                   ] else
                     const SizedBox(height: 4),
-                  _NavItem(
-                    icon: Icons.dashboard_rounded,
-                    label: 'Dashboard',
-                    isActive: selectedIndex == 0,
-                    onTap: () => onItemSelected(0),
-                    collapsed: collapsed,
-                  ),
-                  if (hasAnalysis)
-                    _NavItem(
-                      icon: Icons.analytics_rounded,
-                      label: 'Analyze',
-                      isActive: selectedIndex == 5,
-                      onTap: () => onAnalyzeSelected?.call(),
-                      collapsed: collapsed,
-                      accent: const Color(0xFF22C55E),
+                  Expanded(
+                    child: ClipRect(
+                      child: SingleChildScrollView(
+                        physics: const ClampingScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: collapsed
+                              ? CrossAxisAlignment.center
+                              : CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _NavItem(
+                              icon: Icons.dashboard_rounded,
+                              label: 'Dashboard',
+                              isActive: selectedIndex == 0,
+                              onTap: () => onItemSelected(0),
+                              collapsed: collapsed,
+                            ),
+                            if (hasAnalysis)
+                              _NavItem(
+                                icon: Icons.analytics_rounded,
+                                label: 'Analyze',
+                                isActive: selectedIndex == 5,
+                                onTap: () => onAnalyzeSelected?.call(),
+                                collapsed: collapsed,
+                                accent: const Color(0xFF22C55E),
+                              ),
+                            _NavItem(
+                              icon: Icons.video_library_rounded,
+                              label: 'Library',
+                              isActive: selectedIndex == 1,
+                              onTap: () => onItemSelected(1),
+                              collapsed: collapsed,
+                            ),
+                            ListenableBuilder(
+                              listenable: AppState.instance,
+                              builder: (_, __) {
+                                final n = AppState.instance.downloads
+                                    .where((d) =>
+                                        d.status == DownloadStatus.downloading ||
+                                        d.status == DownloadStatus.queued)
+                                    .length;
+                                return _NavItem(
+                                  icon: Icons.download_rounded,
+                                  label: 'Downloads',
+                                  badge: n > 0 ? '$n' : null,
+                                  isActive: selectedIndex == 2,
+                                  onTap: () => onItemSelected(2),
+                                  collapsed: collapsed,
+                                );
+                              },
+                            ),
+                            _NavItem(
+                              icon: Icons.history_rounded,
+                              label: 'History',
+                              isActive: selectedIndex == 3,
+                              onTap: () => onItemSelected(3),
+                              collapsed: collapsed,
+                            ),
+                            if (!collapsed) ...[
+                              const SizedBox(height: 4),
+                              Text('MORE', style: AppTextStyles.navGroupLabel),
+                              const SizedBox(height: 4),
+                            ] else
+                              const SizedBox(height: 8),
+                            _NavItem(
+                              icon: Icons.settings_rounded,
+                              label: 'Settings',
+                              isActive: selectedIndex == 4,
+                              onTap: () => onItemSelected(4),
+                              collapsed: collapsed,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  _NavItem(
-                    icon: Icons.video_library_rounded,
-                    label: 'Library',
-                    isActive: selectedIndex == 1,
-                    onTap: () => onItemSelected(1),
-                    collapsed: collapsed,
-                  ),
-                  ListenableBuilder(
-                    listenable: AppState.instance,
-                    builder: (_, __) {
-                      final n = AppState.instance.downloads
-                          .where((d) =>
-                              d.status == DownloadStatus.downloading ||
-                              d.status == DownloadStatus.queued)
-                          .length;
-                      return _NavItem(
-                        icon: Icons.download_rounded,
-                        label: 'Downloads',
-                        badge: n > 0 ? '$n' : null,
-                        isActive: selectedIndex == 2,
-                        onTap: () => onItemSelected(2),
-                        collapsed: collapsed,
-                      );
-                    },
-                  ),
-                  _NavItem(
-                    icon: Icons.history_rounded,
-                    label: 'History',
-                    isActive: selectedIndex == 3,
-                    onTap: () => onItemSelected(3),
-                    collapsed: collapsed,
                   ),
                   if (!collapsed) ...[
-                    const SizedBox(height: 4),
-                    Text('MORE', style: AppTextStyles.navGroupLabel),
-                    const SizedBox(height: 4),
-                  ] else
                     const SizedBox(height: 8),
-                  _NavItem(
-                    icon: Icons.settings_rounded,
-                    label: 'Settings',
-                    isActive: selectedIndex == 4,
-                    onTap: () => onItemSelected(4),
-                    collapsed: collapsed,
-                  ),
-                  const Spacer(),
-                  if (!collapsed) _buildStorageBox(),
+                    _buildStorageBox(),
+                  ],
                 ],
               ),
             ),
@@ -144,6 +161,12 @@ class Sidebar extends StatelessWidget {
   }
 
   Widget _buildStorageBox() {
+    final totalBytes = AppState.instance.totalStorageBytes;
+    final label = AppState.formatBytes(totalBytes);
+    // Show count of completed downloads
+    final count = AppState.instance.downloads
+        .where((d) => d.status == DownloadStatus.done)
+        .length;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -159,7 +182,7 @@ class Sidebar extends StatelessWidget {
               Text('Storage',
                   style: AppTextStyles.outfit(
                       fontSize: 12, fontWeight: FontWeight.w600)),
-              Text('62%',
+              Text('$count files',
                   style: AppTextStyles.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -167,24 +190,22 @@ class Sidebar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: SizedBox(
-              height: 3,
-              child: LinearProgressIndicator(
-                value: 0.62,
-                backgroundColor: AppColors.surface3,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.green),
+          Row(
+            children: [
+              Icon(Icons.storage_rounded, size: 12, color: AppColors.muted),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: AppTextStyles.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.text),
               ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '31.2 GB / 50 GB used',
-              style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted),
-            ),
+              Text(
+                ' used',
+                style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted),
+              ),
+            ],
           ),
         ],
       ),
@@ -233,13 +254,28 @@ class _NavItemState extends State<_NavItem> {
         : (_hovered ? AppColors.text : AppColors.muted);
 
     if (widget.collapsed) {
-      // Icon-only mode with tooltip
       return Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Tooltip(
           message: widget.label,
           preferBelow: false,
-          waitDuration: const Duration(milliseconds: 300),
+          textStyle: AppTextStyles.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: AppColors.text,
+          ),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            border: Border.all(color: AppColors.green.withOpacity(0.35)),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 12,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
           child: MouseRegion(
             onEnter: (_) => setState(() => _hovered = true),
             onExit: (_) => setState(() => _hovered = false),
@@ -300,12 +336,15 @@ class _NavItemState extends State<_NavItem> {
               children: [
                 Icon(widget.icon, size: 16, color: iconColor),
                 const SizedBox(width: 10),
-                Text(
-                  widget.label,
-                  style: AppTextStyles.outfit(fontSize: 13, color: iconColor),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    style: AppTextStyles.outfit(fontSize: 13, color: iconColor),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 if (widget.badge != null) ...[
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 1),

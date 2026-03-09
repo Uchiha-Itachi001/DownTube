@@ -11,6 +11,7 @@ class LibraryCard extends StatefulWidget {
   final Color? gradientColor;
   final String? thumbnailUrl;
   final String outputPath;
+  final VoidCallback? onDoubleTap;
 
   const LibraryCard({
     super.key,
@@ -22,6 +23,7 @@ class LibraryCard extends StatefulWidget {
     this.gradientColor,
     this.thumbnailUrl,
     this.outputPath = '',
+    this.onDoubleTap,
   });
 
   @override
@@ -39,11 +41,13 @@ class _LibraryCardState extends State<LibraryCard> {
 
     return Padding(
       padding: const EdgeInsets.only(top: 8.0),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: AnimatedContainer(
+      child: GestureDetector(
+        onDoubleTap: widget.onDoubleTap,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           transform:
               _hovered
@@ -86,6 +90,7 @@ class _LibraryCardState extends State<LibraryCard> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

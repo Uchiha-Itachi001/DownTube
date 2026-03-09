@@ -74,6 +74,9 @@ class AppState extends ChangeNotifier {
     // Load persisted download history from SQLite
     await _loadHistory();
 
+    // Auto-clean records whose files were deleted from disk
+    await cleanMissingFiles();
+
     notifyListeners();
   }
 
@@ -224,13 +227,15 @@ class AppState extends ChangeNotifier {
           }
           notifyListeners();
         } else if (line.contains('[ffmpeg] Merging formats') ||
-            (audioOnly && line.contains('[ffmpeg] Destination:'))) {
+            line.contains('[Merger] Merging formats') ||
+            (audioOnly && (line.contains('[ffmpeg] Destination:') ||
+                line.contains('[ExtractAudio] Destination:')))) {
           // Capture final merged / converted path
-          if (line.contains('[ffmpeg] Merging formats')) {
+          if (line.contains('Merging formats')) {
             final m = RegExp(r'into "(.+)"').firstMatch(line);
             if (m != null) _mergeDest = m.group(1);
-          } else {
-            // audio-only: [ffmpeg] Destination: path
+          } else if (line.contains('Destination:')) {
+            // audio-only: [ffmpeg] or [ExtractAudio] Destination: path
             _ffmpegDest = line.substring(line.indexOf('Destination:') + 'Destination:'.length).trim();
           }
           // Merging video+audio OR ffmpeg audio conversion
@@ -282,13 +287,34 @@ class AppState extends ChangeNotifier {
       item.eta = null;
       // Store the actual output file path so DB can detect when user deletes it
       item.filePath = _mergeDest ?? _ffmpegDest ?? _firstDest ?? '';
+      // If stored path doesn't exist, scan output dir for the actual file
+      if (item.filePath.isNotEmpty && !File(item.filePath).existsSync()) {
+        final dir = Directory(effectivePath);
+        if (dir.existsSync()) {
+          final candidates = dir
+              .listSync()
+              .whereType<File>()
+              .where((f) => f.statSync().modified.isAfter(
+                    DateTime.now().subtract(const Duration(minutes: 5)),
+                  ))
+              .toList();
+          if (candidates.isNotEmpty) {
+            candidates.sort(
+              (a, b) => b.statSync().modified.compareTo(a.statSync().modified),
+            );
+            item.filePath = candidates.first.path;
+          }
+        }
+      }
       pendingNotifications.add(DownloadNotification(
         message: audioOnly ? 'Audio download complete!' : 'Download complete!',
         subtitle: item.title,
         type: DownloadNotifType.mergeDone,
       ));
-      // Persist to SQLite (fire-and-forget, ignore errors)
-      DownloadDb.save(item).catchError((_) {});
+      // Persist to SQLite
+      try {
+        await DownloadDb.save(item);
+      } catch (_) {}
     } catch (e) {
       item.status = DownloadStatus.error;
       item.errorMessage = e.toString();
@@ -355,11 +381,66 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Remove download records whose output files no longer exist on disk.
+  Future<int> cleanMissingFiles() async {
+    final removed = await DownloadDb.cleanMissing();
+    if (removed > 0) {
+      await refreshFromDb();
+    }
+    return removed;
+  }
+
   // ── Settings ──────────────────────────────────────────────────────────────
   Future<void> setDownloadPath(String path) async {
     downloadPath = path;
     await _prefs?.setDownloadPath(path);
     notifyListeners();
+  }
+
+  // ── Storage stats ─────────────────────────────────────────────────────────
+
+  /// Total bytes of all completed downloads.
+  int get totalStorageBytes {
+    int total = 0;
+    for (final d in downloads) {
+      if (d.status == DownloadStatus.done) total += d.fileSizeBytes;
+    }
+    return total;
+  }
+
+  /// Total bytes of video downloads only.
+  int get videoStorageBytes {
+    int total = 0;
+    for (final d in downloads) {
+      if (d.status == DownloadStatus.done && !d.resolution.endsWith('k')) {
+        total += d.fileSizeBytes;
+      }
+    }
+    return total;
+  }
+
+  /// Total bytes of audio downloads only.
+  int get audioStorageBytes {
+    int total = 0;
+    for (final d in downloads) {
+      if (d.status == DownloadStatus.done && d.resolution.endsWith('k')) {
+        total += d.fileSizeBytes;
+      }
+    }
+    return total;
+  }
+
+  /// Format bytes to human-readable string.
+  static String formatBytes(int bytes) {
+    if (bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    int i = 0;
+    double size = bytes.toDouble();
+    while (size >= 1024 && i < units.length - 1) {
+      size /= 1024;
+      i++;
+    }
+    return '${size.toStringAsFixed(size < 10 && i > 0 ? 1 : 0)} ${units[i]}';
   }
 
   Future<void> setYtDlpPath(String path) async {

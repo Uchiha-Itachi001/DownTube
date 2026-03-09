@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/app_colors.dart';
@@ -23,7 +24,8 @@ class _QOption {
 class AnalyzedScreen extends StatefulWidget {
   final String? initialUrl;
   final VoidCallback? onDownload;
-  const AnalyzedScreen({super.key, this.initialUrl, this.onDownload});
+  final VoidCallback? onQueue;
+  const AnalyzedScreen({super.key, this.initialUrl, this.onDownload, this.onQueue});
 
   @override
   State<AnalyzedScreen> createState() => _AnalyzedScreenState();
@@ -33,10 +35,13 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   int _selectedQuality = 0;
   int _selectedTab = 0; // 0 = Video, 1 = Audio
   String _selectedFormat = 'MP4';
-  final Set<String> _checkOptions = {'Embed Subtitles', 'Save Thumbnail'};
+  final Set<String> _checkOptions = {'Save Thumbnail', 'Add Chapters'};
   bool _showDetails = false;
   String? _outputPath; // per-session output folder (overrides saved default)
   ValueNotifier<bool>? _loadingNotifDismiss;
+  final ScrollController _qualityScrollCtrl = ScrollController();
+  bool _qCanScrollLeft = false;
+  bool _qCanScrollRight = false;
   // Track last-notified fetch state to avoid duplicate notifications on every
   // notifyListeners() call while the state remains unchanged (e.g. download
   // progress updates keep firing when this screen stays mounted).
@@ -55,70 +60,16 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
       _selectedTab == 0 ? _videoFormats : _audioFormats;
 
   List<_QOption> _videoQualityTiers(VideoInfo? info) {
-    if (info == null) {
-      return const [
-        _QOption('Best', 'Auto', badge: 'AUTO'),
-        _QOption('4K', 'Ultra HD', badge: 'HDR'),
-        _QOption('1080p', 'Full HD'),
-        _QOption('720p', 'HD'),
-        _QOption('480p', 'SD'),
-        _QOption('360p', 'Low'),
-      ];
-    }
-    // Extract unique heights from actual yt-dlp formats.
-    // Use height != null as the video-stream filter — more robust than hasVideo
-    // because some combined/legacy YouTube formats may have null vcodec.
-    final heightSet =
-        info.formats
-            .where((f) => f.height != null && f.height! >= 144)
-            .map((f) => f.height!)
-            .toSet();
-
-    // Always include the top-level height reported by yt-dlp for its best
-    // format selection.  When yt-dlp cannot resolve DASH adaptive streams
-    // (e.g. no Node.js JS-challenge solver) the formats list only contains
-    // low-resolution combined streams (360p/480p), but the top-level height
-    // field still reflects the true best quality (e.g. 1080p/4K).
-    // Without this the quality tiles would never show the real best quality.
-    if (info.topLevelHeight != null && info.topLevelHeight! >= 144) {
-      heightSet.add(info.topLevelHeight!);
-    }
-
-    final rawHeights = heightSet.toList()..sort((a, b) => b.compareTo(a));
-
-    if (rawHeights.isEmpty) return [const _QOption('720p', 'HD')];
-
-    // Map each height to a named quality tier, deduplicated
-    final seen = <String>{};
-    final result = <_QOption>[];
-    for (final h in rawHeights) {
-      final _QOption q;
-      if (h >= 2160) {
-        q = const _QOption('4K', 'Ultra HD', badge: 'HDR');
-      } else if (h >= 1440) {
-        q = const _QOption('1440p', '2K');
-      } else if (h >= 1080) {
-        q = const _QOption('1080p', 'Full HD');
-      } else if (h >= 720) {
-        q = const _QOption('720p', 'HD');
-      } else if (h >= 480) {
-        q = const _QOption('480p', 'SD');
-      } else if (h >= 360) {
-        q = const _QOption('360p', 'Low');
-      } else if (h >= 240) {
-        q = const _QOption('240p', 'Very Low');
-      } else if (h >= 144) {
-        // 144p and 180p both map to the same tier so they deduplicate cleanly.
-        q = const _QOption('144p', 'Minimum');
-      } else {
-        q = _QOption('${h}p', 'Low');
-      }
-      if (seen.add(q.res)) result.add(q);
-    }
-    final tiers = result.isEmpty ? [const _QOption('720p', 'HD')] : result;
-    // Always prepend the "Best" tile so yt-dlp picks the absolute best
-    // quality automatically, matching the old DownTube behaviour.
-    return [const _QOption('Best', 'Auto', badge: 'AUTO'), ...tiers];
+    // Always show all quality tiers — yt-dlp will pick the closest match
+    return const [
+      _QOption('Best', 'Auto', badge: 'AUTO'),
+      _QOption('4K', 'Ultra HD', badge: 'HDR'),
+      _QOption('1440p', '2K'),
+      _QOption('1080p', 'Full HD'),
+      _QOption('720p', 'HD'),
+      _QOption('480p', 'SD'),
+      _QOption('360p', 'Low'),
+    ];
   }
 
   List<_QOption> _qualities(VideoInfo? info) =>
@@ -128,7 +79,16 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     if (_selectedTab == 0) {
       final qs = _videoQualityTiers(info);
       final q = qs[_selectedQuality.clamp(0, qs.length - 1)];
-      final size = info?.estimatedSize(q.res) ?? '~? MB';
+      final maxH = info?.maxVideoHeight ?? 0;
+      final tierMin = _ScrollableQualityRowState._minHeightFor(q.res);
+      final String size;
+      if (info == null) {
+        size = '~? MB';
+      } else if (tierMin > maxH && q.res != 'Best') {
+        size = 'N/A';
+      } else {
+        size = info.estimatedSize(q.res);
+      }
       return '${q.res} · $size · $_selectedFormat';
     }
     // Audio
@@ -150,11 +110,24 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
 
   VideoInfo? get _info => AppState.instance.videoInfo;
 
+  /// Whether to use vertical layout — works even during loading by checking URL.
+  bool get _isLikelyVertical {
+    final info = _info;
+    if (info != null) return info.isVertical;
+    final url = widget.initialUrl ?? AppState.instance.currentUrl ?? '';
+    return url.contains('/shorts/') || url.contains('/reel/');
+  }
+
   @override
   void initState() {
     super.initState();
     _outputPath = AppState.instance.downloadPath;
+    // Initialise with current state so we don't fire a spurious
+    // "Video ready!" notification when the screen opens while
+    // fetchState is already success from a previous fetch.
+    _lastNotifiedFetchState = AppState.instance.fetchState;
     AppState.instance.addListener(_onStateChange);
+    _qualityScrollCtrl.addListener(_updateQualityScroll);
     if (widget.initialUrl != null &&
         widget.initialUrl!.isNotEmpty &&
         AppState.instance.fetchState == FetchState.idle) {
@@ -178,13 +151,18 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   void _onStateChange() {
     if (!mounted) return;
     final state = AppState.instance.fetchState;
-    setState(() {
-      if (state == FetchState.success) {
+    // Only reset quality/tab/format when state *transitions* to success —
+    // not on every notifyListeners() call (e.g. download progress updates).
+    if (state == FetchState.success &&
+        _lastNotifiedFetchState != FetchState.success) {
+      setState(() {
         _selectedQuality = 0;
         _selectedTab = 0;
         _selectedFormat = 'MP4';
-      }
-    });
+      });
+    } else {
+      setState(() {});
+    }
     // Only fire a notification when the state *transitions* — not on every
     // notifyListeners() call that happens while state is unchanged.
     if (state == FetchState.success &&
@@ -226,13 +204,52 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   void dispose() {
     _loadingNotifDismiss?.value = true;
     _loadingNotifDismiss = null;
+    _qualityScrollCtrl.dispose();
     AppState.instance.removeListener(_onStateChange);
     super.dispose();
   }
 
+  void _updateQualityScroll() {
+    if (!_qualityScrollCtrl.hasClients) return;
+    final pos = _qualityScrollCtrl.position;
+    final maxExt = pos.maxScrollExtent;
+    // If all tiles fit (nothing to scroll), reset offset and disable both arrows
+    if (maxExt <= 0) {
+      if (_qualityScrollCtrl.offset != 0) {
+        _qualityScrollCtrl.jumpTo(0);
+      }
+      if (_qCanScrollLeft || _qCanScrollRight) {
+        setState(() {
+          _qCanScrollLeft = false;
+          _qCanScrollRight = false;
+        });
+      }
+      return;
+    }
+    final canL = _qualityScrollCtrl.offset > 1;
+    final canR = _qualityScrollCtrl.offset < maxExt - 1;
+    if (canL != _qCanScrollLeft || canR != _qCanScrollRight) {
+      setState(() {
+        _qCanScrollLeft = canL;
+        _qCanScrollRight = canR;
+      });
+    }
+  }
+
+  void _scrollQuality(double delta) {
+    _qualityScrollCtrl.animateTo(
+      (_qualityScrollCtrl.offset + delta).clamp(
+        0.0,
+        _qualityScrollCtrl.position.maxScrollExtent,
+      ),
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_info?.isVertical ?? false) {
+    if (_isLikelyVertical) {
       return _buildVerticalLayout();
     }
     return _buildHorizontalLayout();
@@ -254,6 +271,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   }
 
   Widget _buildVerticalLayout() {
+    if (_showSkeleton) return _buildVerticalSkeleton();
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -299,6 +317,50 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   }
 
   // ── VIDEO HEADER ───────────────────────────────────────────────────────────
+
+  Widget _buildVerticalSkeleton() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Left Column skeleton
+        SizedBox(
+          width: 350,
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              border: Border.all(color: AppColors.green.withOpacity(0.12)),
+              borderRadius: BorderRadius.circular(AppColors.radius),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Expanded(child: ShimmerBox(borderRadius: 0)),
+                _buildInfoPanelSkeleton(),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: AppColors.gap),
+        // Right Column skeleton
+        Expanded(
+          flex: 6,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: _buildConfigCardSkeleton(),
+                ),
+              ),
+              const SizedBox(height: AppColors.gap),
+              _buildActionBarSkeleton(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildVideoHeader() {
     return Container(
@@ -862,7 +924,15 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           const SizedBox(height: 20),
 
           // ── Quality
-          _sectionLabel('QUALITY'),
+          Row(
+            children: [
+              _sectionLabel('QUALITY'),
+              const Spacer(),
+              _smallArrow(Icons.chevron_left_rounded, _qCanScrollLeft, () => _scrollQuality(-120)),
+              const SizedBox(width: 4),
+              _smallArrow(Icons.chevron_right_rounded, _qCanScrollRight, () => _scrollQuality(120)),
+            ],
+          ),
           const SizedBox(height: 10),
           _buildQualityRow(info),
           const SizedBox(height: 20),
@@ -910,16 +980,14 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
                     Wrap(
                       spacing: 18,
                       runSpacing: 10,
-                      children:
-                          (_selectedTab == 0
-                                  ? [
-                                    'Embed Subtitles',
-                                    'Save Thumbnail',
-                                    'Add Chapters',
-                                  ]
-                                  : ['Embed Cover Art', 'Album Tags'])
-                              .map(_checkOption)
-                              .toList(),
+                      children: [
+                        // Save Thumbnail — always enabled, non-toggleable
+                        _lockedOption('Save Thumbnail'),
+                        ...(_selectedTab == 0
+                                ? ['Add Chapters', 'Embed Metadata']
+                                : ['Embed Cover Art', 'Embed Metadata'])
+                            .map(_checkOption),
+                      ],
                     ),
                   ],
                 ),
@@ -1051,22 +1119,42 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   Widget _buildQualityRow(VideoInfo? info) {
     final quals = _qualities(info);
     if (quals.isEmpty) return const SizedBox.shrink();
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: List.generate(quals.length, (i) {
-        final sizeStr = info?.estimatedSize(quals[i].res) ?? '~? MB';
-        return GestureDetector(
-          onTap: () => setState(() => _selectedQuality = i),
-          child: _QualityTile(
-            res: quals[i].res,
-            name: quals[i].name,
-            size: sizeStr,
-            badge: quals[i].badge,
-            isSelected: _selectedQuality == i,
+    return _ScrollableQualityRow(
+      quals: quals,
+      info: info,
+      selectedQuality: _selectedQuality,
+      onQualitySelected: (i) => setState(() => _selectedQuality = i),
+      scrollController: _qualityScrollCtrl,
+      onLayoutChanged: _updateQualityScroll,
+    );
+  }
+
+  Widget _smallArrow(IconData icon, bool enabled, VoidCallback onTap) {
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      child: GestureDetector(
+        onTap: enabled ? onTap : null,
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: enabled ? AppColors.surface2 : AppColors.surface1,
+            border: Border.all(
+              color: enabled
+                  ? AppColors.green.withOpacity(0.40)
+                  : AppColors.border,
+            ),
+            borderRadius: BorderRadius.circular(6),
           ),
-        );
-      }),
+          child: Center(
+            child: Icon(
+              icon,
+              size: 14,
+              color: enabled ? AppColors.green : AppColors.muted.withOpacity(0.3),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1099,47 +1187,48 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
 
   Widget _formatBtn(String format) {
     final sel = _selectedFormat == format;
+    final icon = _formatIcon(format);
     return GestureDetector(
       onTap: () => setState(() => _selectedFormat = format),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: sel ? AppColors.greenDim : AppColors.surface2,
+          color: sel ? AppColors.green : Colors.transparent,
           border: Border.all(
-            color: sel ? AppColors.green.withOpacity(0.55) : AppColors.border,
-            width: sel ? 1.5 : 1.0,
+            color: sel ? AppColors.green : AppColors.border,
           ),
           borderRadius: BorderRadius.circular(8),
-          boxShadow:
-              sel
-                  ? [
-                    BoxShadow(
-                      color: AppColors.green.withOpacity(0.14),
-                      blurRadius: 12,
-                    ),
-                  ]
-                  : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Icon(icon, size: 12, color: sel ? Colors.black : AppColors.muted),
+            const SizedBox(width: 5),
             Text(
               format,
-              style: AppTextStyles.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: sel ? AppColors.green : AppColors.muted,
+              style: AppTextStyles.mono(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: sel ? Colors.black : AppColors.muted,
               ),
             ),
-            if (sel) ...[
-              const SizedBox(width: 5),
-              const Icon(Icons.check_rounded, size: 13, color: AppColors.green),
-            ],
           ],
         ),
       ),
     );
+  }
+
+  IconData _formatIcon(String format) {
+    switch (format) {
+      case 'MP4': return Icons.videocam_rounded;
+      case 'MKV': return Icons.movie_rounded;
+      case 'WEBM': return Icons.web_rounded;
+      case 'MP3': return Icons.music_note_rounded;
+      case 'WAV': return Icons.graphic_eq_rounded;
+      case 'FLAC': return Icons.album_rounded;
+      default: return Icons.insert_drive_file_rounded;
+    }
   }
 
   Widget _checkOption(String label) {
@@ -1200,6 +1289,43 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     );
   }
 
+  /// Always-on option (non-toggleable, shown as checked).
+  Widget _lockedOption(String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 15,
+          height: 15,
+          decoration: BoxDecoration(
+            color: AppColors.green,
+            border: Border.all(color: AppColors.green),
+            borderRadius: BorderRadius.circular(4),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.green.withOpacity(0.4),
+                blurRadius: 6,
+              ),
+            ],
+          ),
+          child: const Center(
+            child: Icon(Icons.check_rounded, size: 11, color: Colors.black),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: AppTextStyles.outfit(
+            fontSize: 12,
+            color: AppColors.text.withOpacity(0.88),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Icon(Icons.lock_rounded, size: 10, color: AppColors.green.withOpacity(0.5)),
+      ],
+    );
+  }
+
   // ── ACTION BAR ─────────────────────────────────────────────────────────────
 
   Widget _buildConfigCardSkeleton() {
@@ -1249,61 +1375,68 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   Widget _buildActionBar() {
     if (_showSkeleton) return _buildActionBarSkeleton();
     final info = _info;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.18)),
-        borderRadius: BorderRadius.circular(AppColors.radius),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _summaryLabel(info),
-                  style: AppTextStyles.outfit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 500;
+        return Container(
+          padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            border: Border.all(color: AppColors.green.withOpacity(0.18)),
+            borderRadius: BorderRadius.circular(AppColors.radius),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.check_circle_outline_rounded,
-                      size: 12,
-                      color: AppColors.green,
-                    ),
-                    const SizedBox(width: 3),
                     Text(
-                      'No DRM detected',
+                      _summaryLabel(info),
                       style: AppTextStyles.outfit(
-                        fontSize: 11,
-                        color: AppColors.green,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 12,
+                          color: AppColors.green,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          'No DRM detected',
+                          style: AppTextStyles.outfit(
+                            fontSize: 11,
+                            color: AppColors.green,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              _ghostBtn(
+                Icons.queue_rounded,
+                '+ Queue',
+                info != null ? () => _onQueue() : null,
+                compact: compact,
+              ),
+              const SizedBox(width: 10),
+              _primaryBtn(
+                Icons.download_rounded,
+                'Download Now',
+                info != null ? () => _onDownload() : null,
+                compact: compact,
+              ),
+            ],
           ),
-          _ghostBtn(
-            Icons.queue_rounded,
-            '+ Queue',
-            info != null ? () => _onQueue() : null,
-          ),
-          const SizedBox(width: 10),
-          _primaryBtn(
-            Icons.download_rounded,
-            'Download Now',
-            info != null ? () => _onDownload() : null,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1378,7 +1511,6 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     );
     if (result != null && mounted) {
       setState(() => _outputPath = result);
-      AppState.instance.setDownloadPath(result);
     }
   }
 
@@ -1401,7 +1533,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         videoDuration: info.duration,
       ),
     );
-    widget.onDownload?.call();
+    widget.onQueue?.call();
   }
 
   Future<void> _onDownload() async {
@@ -1425,12 +1557,12 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     widget.onDownload?.call();
   }
 
-  Widget _ghostBtn(IconData icon, String label, VoidCallback? onTap) {
+  Widget _ghostBtn(IconData icon, String label, VoidCallback? onTap, {bool compact = false}) {
     return _HoverBtn(
       onTap: onTap,
       builder:
           (hov) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 16, vertical: 9),
             decoration: BoxDecoration(
               color:
                   hov ? AppColors.green.withOpacity(0.07) : Colors.transparent,
@@ -1441,28 +1573,30 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(icon, size: 15, color: AppColors.green),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: AppTextStyles.outfit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.green,
+                if (!compact) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: AppTextStyles.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.green,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
     );
   }
 
-  Widget _primaryBtn(IconData icon, String label, VoidCallback? onTap) {
+  Widget _primaryBtn(IconData icon, String label, VoidCallback? onTap, {bool compact = false}) {
     return _HoverBtn(
       onTap: onTap,
       builder:
           (hov) => AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+            padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 22, vertical: 10),
             decoration: BoxDecoration(
               color: AppColors.green,
               borderRadius: BorderRadius.circular(10),
@@ -1482,15 +1616,17 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(icon, size: 17, color: Colors.black),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: AppTextStyles.syne(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
+                if (!compact) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: AppTextStyles.syne(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -1693,6 +1829,120 @@ class _ExpandableTextState extends State<_ExpandableText> {
   }
 }
 
+// ── Scrollable quality row with arrow buttons ────────────────────────────────
+
+class _ScrollableQualityRow extends StatefulWidget {
+  final List<_QOption> quals;
+  final VideoInfo? info;
+  final int selectedQuality;
+  final ValueChanged<int> onQualitySelected;
+  final ScrollController scrollController;
+  final VoidCallback? onLayoutChanged;
+
+  const _ScrollableQualityRow({
+    required this.quals,
+    required this.info,
+    required this.selectedQuality,
+    required this.onQualitySelected,
+    required this.scrollController,
+    this.onLayoutChanged,
+  });
+
+  @override
+  State<_ScrollableQualityRow> createState() => _ScrollableQualityRowState();
+}
+
+class _ScrollableQualityRowState extends State<_ScrollableQualityRow> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onLayoutChanged?.call();
+    });
+  }
+
+  /// Map resolution label to the minimum height it requires.
+  static int _minHeightFor(String res) {
+    switch (res) {
+      case '4K':   return 2160;
+      case '1440p': return 1440;
+      case '1080p': return 1080;
+      case '720p':  return 720;
+      case '480p':  return 480;
+      case '360p':  return 360;
+      case '240p':  return 240;
+      case '144p':  return 144;
+      default:      return 0; // 'Best' and audio tiers always have a size
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxH = widget.info?.maxVideoHeight ?? 0;
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (_) {
+        // Layout changed (window resize) — re-evaluate arrow state
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          widget.onLayoutChanged?.call();
+        });
+        return false;
+      },
+      child: SizedBox(
+        height: 120,
+        child: Listener(
+          onPointerSignal: (event) {
+            if (event is PointerScrollEvent) {
+              final ctrl = widget.scrollController;
+              ctrl.animateTo(
+                (ctrl.offset + event.scrollDelta.dy).clamp(
+                  0.0,
+                  ctrl.position.maxScrollExtent,
+                ),
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+              );
+            }
+          },
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(
+              scrollbars: false,
+            ),
+            child: ListView.separated(
+              controller: widget.scrollController,
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.quals.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final q = widget.quals[i];
+                final tierMin = _minHeightFor(q.res);
+                // Show 'N/A' for tiers above the video's actual best quality
+                final String sizeStr;
+                if (widget.info == null) {
+                  sizeStr = '~? MB';
+                } else if (tierMin > maxH && q.res != 'Best') {
+                  sizeStr = 'N/A';
+                } else {
+                  sizeStr = widget.info!.estimatedSize(q.res);
+                }
+                return GestureDetector(
+                  onTap: () => widget.onQualitySelected(i),
+                  child: _QualityTile(
+                    res: q.res,
+                    name: q.name,
+                    size: sizeStr,
+                    badge: q.badge,
+                    isSelected: widget.selectedQuality == i,
+                  ),
+                );
+            },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ── Quality tile ─────────────────────────────────────────────────────────────
 
 class _QualityTile extends StatefulWidget {
@@ -1774,6 +2024,7 @@ class _QualityTileState extends State<_QualityTile> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         width: 106,
+        height: 120,
         decoration: BoxDecoration(
           color:
               sel

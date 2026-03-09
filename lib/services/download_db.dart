@@ -86,42 +86,18 @@ class DownloadDb {
     );
   }
 
-  /// Load all saved records. Removes:
-  ///  - Entries whose output directory is gone from disk.
-  ///  - Duplicate URL entries — only the most recent download per URL is kept.
+  /// Load all saved records. Deduplicates by URL (keeps most recent per URL).
+  /// Does NOT remove records with missing files — use [cleanMissing] for that.
   static Future<List<DownloadItem>> loadAndClean() async {
     final db = await _database;
     final rows = await db.query('downloads', orderBy: 'created_at DESC');
 
-    final valid = <DownloadItem>[];
-    final staleIds = <String>[];
-
-    for (final row in rows) {
-      final item = DownloadItem.fromDbMap(row);
-      // If we captured the actual output file, check it directly.
-      // Otherwise fall back to checking the output folder (for old records).
-      final bool exists;
-      if (item.filePath.isNotEmpty) {
-        exists = File(item.filePath).existsSync();
-      } else {
-        final dir = item.outputPath;
-        exists = dir.isEmpty || Directory(dir).existsSync();
-      }
-      if (exists) {
-        valid.add(item);
-      } else {
-        staleIds.add(item.id);
-      }
-    }
-
-    for (final id in staleIds) {
-      await db.delete('downloads', where: 'id = ?', whereArgs: [id]);
-    }
+    final items = rows.map((row) => DownloadItem.fromDbMap(row)).toList();
 
     // Deduplicate: keep only the most recent record per URL
     final seenUrls = <String>{};
     final deduped = <DownloadItem>[];
-    for (final item in valid) {
+    for (final item in items) {
       final key = item.url.isNotEmpty ? item.url : item.id;
       if (seenUrls.add(key)) {
         deduped.add(item);
@@ -132,6 +108,44 @@ class DownloadDb {
     }
 
     return deduped;
+  }
+
+  /// Remove records whose output files no longer exist on disk.
+  static Future<int> cleanMissing() async {
+    final db = await _database;
+    final rows = await db.query('downloads', orderBy: 'created_at DESC');
+    int removed = 0;
+    for (final row in rows) {
+      final item = DownloadItem.fromDbMap(row);
+      final bool exists;
+      if (item.filePath.isNotEmpty) {
+        // Check exact path first
+        if (File(item.filePath).existsSync()) {
+          exists = true;
+        } else {
+          // yt-dlp may have changed the extension during merge/conversion.
+          // Look for any file with the same base name in the same directory.
+          final dir = Directory(p.dirname(item.filePath));
+          final baseName = p.basenameWithoutExtension(item.filePath);
+          if (dir.existsSync()) {
+            exists = dir.listSync().whereType<File>().any(
+              (f) => p.basenameWithoutExtension(f.path) == baseName,
+            );
+          } else {
+            exists = false;
+          }
+        }
+      } else {
+        // No filePath stored (legacy record) — we can't verify file existence,
+        // so keep the record to avoid wrongly deleting valid entries.
+        exists = true;
+      }
+      if (!exists) {
+        await db.delete('downloads', where: 'id = ?', whereArgs: [item.id]);
+        removed++;
+      }
+    }
+    return removed;
   }
 
   /// Remove a single record (e.g. user deletes from library).
