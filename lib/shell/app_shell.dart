@@ -134,8 +134,8 @@ class _AppShellState extends State<AppShell>
           builder: (context, constraints) {
             final w = constraints.maxWidth;
             // Responsive sidebar: hidden in drawer <700, collapsed icon-only 700-800, full >800
-            final isDrawer = w < 800;
-            final collapsed = !isDrawer && w < 950;
+                final isDrawer = w < 900;
+            final collapsed = !isDrawer && w < 1200;
             final sidebarWidth =
                 isDrawer
                     ? 0.0
