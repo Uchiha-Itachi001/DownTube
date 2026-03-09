@@ -9,12 +9,14 @@ class AppHeader extends StatefulWidget {
   final bool isRefreshing;
   final AnimationController? refreshSpinCtrl;
   final VoidCallback? onRefresh;
+  final VoidCallback? onOpenDrawer;
 
   const AppHeader({
     super.key,
     this.isRefreshing = false,
     this.refreshSpinCtrl,
     this.onRefresh,
+    this.onOpenDrawer,
   });
 
   @override
@@ -50,6 +52,10 @@ class _AppHeaderState extends State<AppHeader> {
       ),
       child: Row(
         children: [
+          if (widget.onOpenDrawer != null) ...[
+            _buildIconButton(Icons.menu_rounded, widget.onOpenDrawer),
+            const SizedBox(width: 12),
+          ],
           _buildEnginePill(),
           const Spacer(),
           _buildRefreshButton(),
@@ -66,9 +72,10 @@ class _AppHeaderState extends State<AppHeader> {
     final ready = AppState.instance.ytDlpReady;
     final version = AppState.instance.ytDlpVersion;
     final label = ready ? 'Engine Ready' : 'Engine Offline';
-    final sub = ready
-        ? (version != null ? 'yt-dlp $version' : 'yt-dlp ready')
-        : 'yt-dlp not found';
+    final sub =
+        ready
+            ? (version != null ? 'yt-dlp $version' : 'yt-dlp ready')
+            : 'yt-dlp not found';
     final color = ready ? AppColors.green : AppColors.red;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -132,34 +139,41 @@ class _AppHeaderState extends State<AppHeader> {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: widget.isRefreshing
-              ? AppColors.green.withOpacity(0.12)
-              : AppColors.surface2,
+          color:
+              widget.isRefreshing
+                  ? AppColors.green.withOpacity(0.12)
+                  : AppColors.surface2,
           border: Border.all(
-            color: widget.isRefreshing
-                ? AppColors.green.withOpacity(0.4)
-                : AppColors.border,
+            color:
+                widget.isRefreshing
+                    ? AppColors.green.withOpacity(0.4)
+                    : AppColors.border,
           ),
           borderRadius: BorderRadius.circular(9),
         ),
         child: Center(
-          child: ctrl != null
-              ? AnimatedBuilder(
-                  animation: ctrl,
-                  builder: (_, __) => Transform.rotate(
-                    angle: ctrl.value * 2 * math.pi,
-                    child: Icon(
-                      Icons.refresh_rounded,
-                      size: 16,
-                      color: widget.isRefreshing ? AppColors.green : AppColors.muted,
-                    ),
+          child:
+              ctrl != null
+                  ? AnimatedBuilder(
+                    animation: ctrl,
+                    builder:
+                        (_, __) => Transform.rotate(
+                          angle: ctrl.value * 2 * math.pi,
+                          child: Icon(
+                            Icons.refresh_rounded,
+                            size: 16,
+                            color:
+                                widget.isRefreshing
+                                    ? AppColors.green
+                                    : AppColors.muted,
+                          ),
+                        ),
+                  )
+                  : Icon(
+                    Icons.refresh_rounded,
+                    size: 16,
+                    color: AppColors.muted,
                   ),
-                )
-              : Icon(
-                  Icons.refresh_rounded,
-                  size: 16,
-                  color: AppColors.muted,
-                ),
         ),
       ),
     );
@@ -202,7 +216,9 @@ class _AppHeaderState extends State<AppHeader> {
               Text(
                 'DownTube',
                 style: AppTextStyles.outfit(
-                    fontSize: 12, fontWeight: FontWeight.w600),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               Text(
                 'PREMIUM',
@@ -239,9 +255,10 @@ class _PulsingDotState extends State<_PulsingDot>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
-    _animation = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _animation = Tween<double>(
+      begin: 0.6,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -265,12 +282,7 @@ class _PulsingDotState extends State<_PulsingDot>
               decoration: BoxDecoration(
                 color: widget.color,
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: widget.color,
-                    blurRadius: 8,
-                  ),
-                ],
+                boxShadow: [BoxShadow(color: widget.color, blurRadius: 8)],
               ),
             ),
           ),
@@ -325,17 +337,27 @@ class _DownloadHeaderBtn extends StatelessWidget {
         // Pick the actively downloading item first, then first queued
         DownloadItem? current;
         for (final d in downloads) {
-          if (d.status == DownloadStatus.downloading) { current = d; break; }
+          if (d.status == DownloadStatus.downloading) {
+            current = d;
+            break;
+          }
         }
-        current ??= downloads.where((d) => d.status == DownloadStatus.queued).firstOrNull;
+        current ??=
+            downloads
+                .where((d) => d.status == DownloadStatus.queued)
+                .firstOrNull;
 
         final isActive = current != null;
-        final pct = isActive ? (current!.progress * 100).clamp(0, 100).toInt() : 0;
-        final queuedCount = downloads
-            .where((d) =>
-                d.status == DownloadStatus.downloading ||
-                d.status == DownloadStatus.queued)
-            .length;
+        final pct =
+            isActive ? (current!.progress * 100).clamp(0, 100).toInt() : 0;
+        final queuedCount =
+            downloads
+                .where(
+                  (d) =>
+                      d.status == DownloadStatus.downloading ||
+                      d.status == DownloadStatus.queued,
+                )
+                .length;
 
         return AnimatedContainer(
           duration: const Duration(milliseconds: 300),
@@ -346,9 +368,10 @@ class _DownloadHeaderBtn extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface2,
             border: Border.all(
-              color: isActive
-                  ? AppColors.green.withOpacity(0.40)
-                  : AppColors.border,
+              color:
+                  isActive
+                      ? AppColors.green.withOpacity(0.40)
+                      : AppColors.border,
             ),
             borderRadius: BorderRadius.circular(9),
           ),
@@ -374,14 +397,20 @@ class _DownloadHeaderBtn extends StatelessWidget {
                         right: 4,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 3, vertical: 1),
+                            horizontal: 3,
+                            vertical: 1,
+                          ),
                           constraints: const BoxConstraints(
-                              minWidth: 14, minHeight: 14),
+                            minWidth: 14,
+                            minHeight: 14,
+                          ),
                           decoration: BoxDecoration(
                             color: AppColors.green,
                             borderRadius: BorderRadius.circular(7),
                             border: Border.all(
-                                color: AppColors.surface2, width: 1.5),
+                              color: AppColors.surface2,
+                              width: 1.5,
+                            ),
                           ),
                           child: Text(
                             '$queuedCount',
@@ -399,87 +428,109 @@ class _DownloadHeaderBtn extends StatelessWidget {
               ),
               // ── Expanded section (always in layout so Row never overflows)
               Expanded(
-                child: isActive
-                    ? Row(
-                        children: [
-                          Container(width: 1, height: 20, color: AppColors.border),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Title + percentage
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          current!.title,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: AppTextStyles.outfit(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.text,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        '$pct%',
-                                        style: AppTextStyles.outfit(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.green,
-                                        ),
-                                      ),
-                                      if (queuedCount > 1) ...[
-                                        const SizedBox(width: 4),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 4, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.green.withOpacity(0.15),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
+                child:
+                    isActive
+                        ? Row(
+                          children: [
+                            Container(
+                              width: 1,
+                              height: 20,
+                              color: AppColors.border,
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Title + percentage
+                                    Row(
+                                      children: [
+                                        Expanded(
                                           child: Text(
-                                            '+${queuedCount - 1}',
+                                            current!.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                             style: AppTextStyles.outfit(
-                                              fontSize: 8,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.green,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.text,
                                             ),
                                           ),
                                         ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '$pct%',
+                                          style: AppTextStyles.outfit(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.green,
+                                          ),
+                                        ),
+                                        if (queuedCount > 1) ...[
+                                          const SizedBox(width: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 4,
+                                              vertical: 1,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.green
+                                                  .withOpacity(0.15),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '+${queuedCount - 1}',
+                                              style: AppTextStyles.outfit(
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.green,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  // Smooth progress bar
-                                  TweenAnimationBuilder<double>(
-                                    tween: Tween(begin: 0, end: current!.progress),
-                                    duration: const Duration(milliseconds: 400),
-                                    curve: Curves.easeOut,
-                                    builder: (_, v, __) => ClipRRect(
-                                      borderRadius: BorderRadius.circular(2),
-                                      child: LinearProgressIndicator(
-                                        value: v,
-                                        backgroundColor:
-                                            AppColors.surface2.withOpacity(0.6),
-                                        valueColor: const AlwaysStoppedAnimation(
-                                            AppColors.green),
-                                        minHeight: 3,
-                                      ),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(height: 4),
+                                    // Smooth progress bar
+                                    TweenAnimationBuilder<double>(
+                                      tween: Tween(
+                                        begin: 0,
+                                        end: current!.progress,
+                                      ),
+                                      duration: const Duration(
+                                        milliseconds: 400,
+                                      ),
+                                      curve: Curves.easeOut,
+                                      builder:
+                                          (_, v, __) => ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              2,
+                                            ),
+                                            child: LinearProgressIndicator(
+                                              value: v,
+                                              backgroundColor: AppColors
+                                                  .surface2
+                                                  .withOpacity(0.6),
+                                              valueColor:
+                                                  const AlwaysStoppedAnimation(
+                                                    AppColors.green,
+                                                  ),
+                                              minHeight: 3,
+                                            ),
+                                          ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      )
-                    : const SizedBox.shrink(),
+                          ],
+                        )
+                        : const SizedBox.shrink(),
               ),
             ],
           ),

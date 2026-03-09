@@ -20,20 +20,18 @@ class FormatInfo {
   });
 
   factory FormatInfo.fromJson(Map<String, dynamic> j) => FormatInfo(
-        formatId: j['format_id'] as String? ?? '',
-        ext: j['ext'] as String? ?? '',
-        width: (j['width'] as num?)?.toInt(),
-        height: (j['height'] as num?)?.toInt(),
-        tbr: (j['tbr'] as num?)?.toInt(),
-        abr: (j['abr'] as num?)?.toInt(),
-        acodec: j['acodec'] as String?,
-        vcodec: j['vcodec'] as String?,
-      );
+    formatId: j['format_id'] as String? ?? '',
+    ext: j['ext'] as String? ?? '',
+    width: (j['width'] as num?)?.toInt(),
+    height: (j['height'] as num?)?.toInt(),
+    tbr: (j['tbr'] as num?)?.toInt(),
+    abr: (j['abr'] as num?)?.toInt(),
+    acodec: j['acodec'] as String?,
+    vcodec: j['vcodec'] as String?,
+  );
 
-  bool get hasVideo =>
-      vcodec != null && vcodec != 'none' && vcodec!.isNotEmpty;
-  bool get hasAudio =>
-      acodec != null && acodec != 'none' && acodec!.isNotEmpty;
+  bool get hasVideo => vcodec != null && vcodec != 'none' && vcodec!.isNotEmpty;
+  bool get hasAudio => acodec != null && acodec != 'none' && acodec!.isNotEmpty;
 }
 
 class VideoInfo {
@@ -51,6 +49,7 @@ class VideoInfo {
   final String? webpageUrl;
   final List<FormatInfo> formats;
   final String? extractor;
+
   /// Height of the best format yt-dlp selected (top-level JSON field).
   /// Used as a fallback when the formats list lacks adaptive streams.
   final int? topLevelHeight;
@@ -81,17 +80,17 @@ class VideoInfo {
       description: j['description'] as String?,
       thumbnail: j['thumbnail'] as String?,
       channelName: j['channel'] as String? ?? j['uploader'] as String?,
-      channelId:
-          j['channel_id'] as String? ?? j['uploader_id'] as String?,
+      channelId: j['channel_id'] as String? ?? j['uploader_id'] as String?,
       subscriberCount: (j['channel_follower_count'] as num?)?.toInt(),
       viewCount: (j['view_count'] as num?)?.toInt(),
       likeCount: (j['like_count'] as num?)?.toInt(),
       duration: (j['duration'] as num?)?.toInt(),
       uploadDate: j['upload_date'] as String?,
       webpageUrl: j['webpage_url'] as String?,
-      formats: rawFormats
-          .map((f) => FormatInfo.fromJson(f as Map<String, dynamic>))
-          .toList(),
+      formats:
+          rawFormats
+              .map((f) => FormatInfo.fromJson(f as Map<String, dynamic>))
+              .toList(),
       extractor: j['extractor'] as String?,
       topLevelHeight: (j['height'] as num?)?.toInt(),
     );
@@ -114,8 +113,18 @@ class VideoInfo {
   String get formattedDate {
     if (uploadDate == null || uploadDate!.length != 8) return '';
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final m = int.tryParse(uploadDate!.substring(4, 6)) ?? 1;
     final d = uploadDate!.substring(6, 8);
@@ -139,6 +148,31 @@ class VideoInfo {
     return '$s subscribers';
   }
 
+  bool get isVertical {
+    if (extractor != null &&
+        (extractor!.toLowerCase().contains('instagram') ||
+            extractor!.toLowerCase().contains('tiktok'))) {
+      return true;
+    }
+    if (webpageUrl != null &&
+        (webpageUrl!.contains('/shorts/') || webpageUrl!.contains('/reel/'))) {
+      return true;
+    }
+
+    int maxW = 0;
+    int maxH = 0;
+    for (final f in formats) {
+      if (f.width != null && f.height != null) {
+        if (f.height! > maxH) {
+          maxH = f.height!;
+          maxW = f.width!;
+        }
+      }
+    }
+    if (maxW > 0 && maxH > maxW) return true;
+    return false;
+  }
+
   int get maxVideoHeight {
     int max = 0;
     for (final f in formats) {
@@ -147,7 +181,9 @@ class VideoInfo {
     // Fall back to the top-level height yt-dlp reported for its best selection
     // (useful when the formats list only contains combined/legacy streams).
     if (max == 0 && topLevelHeight != null) return topLevelHeight!;
-    return (topLevelHeight != null && topLevelHeight! > max) ? topLevelHeight! : max;
+    return (topLevelHeight != null && topLevelHeight! > max)
+        ? topLevelHeight!
+        : max;
   }
 
   String get bestQualityLabel {
@@ -169,21 +205,21 @@ class VideoInfo {
       if (h >= 2160) return estimatedSize('4K');
       if (h >= 1440) return estimatedSize('1440p');
       if (h >= 1080) return estimatedSize('1080p');
-      if (h >= 720)  return estimatedSize('720p');
-      if (h >= 480)  return estimatedSize('480p');
-      if (h >= 360)  return estimatedSize('360p');
-      if (h >= 240)  return estimatedSize('240p');
+      if (h >= 720) return estimatedSize('720p');
+      if (h >= 480) return estimatedSize('480p');
+      if (h >= 360) return estimatedSize('360p');
+      if (h >= 240) return estimatedSize('240p');
       return estimatedSize('144p');
     }
     final d = duration!;
     double mbps;
     switch (resolution) {
       case '4K':
-        mbps = 8.0;   // VP9/AV1 4K
+        mbps = 8.0; // VP9/AV1 4K
       case '1440p':
         mbps = 4.0;
       case '1080p':
-        mbps = 1.5;   // VP9/AV1 1080p (was 3.5 AVC)
+        mbps = 1.5; // VP9/AV1 1080p (was 3.5 AVC)
       case '720p':
         mbps = 0.8;
       case '480p':

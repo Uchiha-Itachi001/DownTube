@@ -77,8 +77,8 @@ class DashboardScreen extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: AppColors.green.withOpacity(0.45),
-                    width: 1.5,
+                    color: AppColors.green.withOpacity(0.35),
+                    width: 1,
                   ),
                   borderRadius: BorderRadius.circular(AppColors.radius),
                 ),

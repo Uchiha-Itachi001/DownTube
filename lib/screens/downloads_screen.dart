@@ -41,7 +41,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         final (type, icon) = switch (n.type) {
           DownloadNotifType.videoPhase => (NotificationType.info, null),
           DownloadNotifType.audioPhase => (NotificationType.info, null),
-          DownloadNotifType.mergeDone  => (NotificationType.success, null),
+          DownloadNotifType.mergeDone => (NotificationType.success, null),
         };
         showAppNotification(
           context,
@@ -60,92 +60,108 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       listenable: AppState.instance,
       builder: (context, _) {
         final all = AppState.instance.downloads;
-        final active = all
-            .where((d) =>
-                d.status == DownloadStatus.downloading ||
-                d.status == DownloadStatus.queued)
-            .toList();
-        final completed = all
-            .where((d) =>
-                (d.status == DownloadStatus.done ||
-                 d.status == DownloadStatus.error) &&
-                d.showInHistory)
-            .toList();
+        final active =
+            all
+                .where(
+                  (d) =>
+                      d.status == DownloadStatus.downloading ||
+                      d.status == DownloadStatus.queued,
+                )
+                .toList();
+        final completed =
+            all
+                .where(
+                  (d) =>
+                      (d.status == DownloadStatus.done ||
+                          d.status == DownloadStatus.error) &&
+                      d.showInHistory,
+                )
+                .toList();
 
-        return LayoutBuilder(builder: (context, constraints) {
-          final narrow = constraints.maxWidth < 750;
-          if (narrow) {
-            return SingleChildScrollView(
-              child: Column(
-                children: [
-                  _buildActiveSection(active),
-                  const SizedBox(height: AppColors.gap),
-                  _buildCompletedSection(completed),
-                  const SizedBox(height: AppColors.gap),
-                  _buildSessionStats(all),
-                  const SizedBox(height: AppColors.gap),
-                  _buildSpeedPanel(active),
-                  const SizedBox(height: AppColors.gap),
-                  _buildQuickAdd(),
-                ],
-              ),
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 750;
+            if (narrow) {
+              return SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildActiveSection(active),
+                    const SizedBox(height: AppColors.gap),
+                    _buildCompletedSection(completed),
+                    const SizedBox(height: AppColors.gap),
+                    _buildSessionStats(all),
+                    const SizedBox(height: AppColors.gap),
+                    _buildSpeedPanel(active),
+                    const SizedBox(height: AppColors.gap),
+                    _buildQuickAdd(),
+                  ],
+                ),
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(right: AppColors.gap),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildActiveSection(active),
+                        const SizedBox(height: AppColors.gap),
+                        _buildCompletedSection(completed),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 260,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _buildSessionStats(all),
+                        const SizedBox(height: AppColors.gap),
+                        _buildSpeedPanel(active),
+                        const SizedBox(height: AppColors.gap),
+                        _buildQuickAdd(),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 3,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(right: AppColors.gap),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildActiveSection(active),
-                      const SizedBox(height: AppColors.gap),
-                      _buildCompletedSection(completed),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(
-                width: 260,
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildSessionStats(all),
-                      const SizedBox(height: AppColors.gap),
-                      _buildSpeedPanel(active),
-                      const SizedBox(height: AppColors.gap),
-                      _buildQuickAdd(),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        });
+          },
+        );
       },
     );
   }
 
   Widget _buildActiveSection(List<DownloadItem> active) {
-    final inner = active.isEmpty
-        ? _emptyState('No active downloads', Icons.download_outlined,
-            subtitle: 'Analyze a video and start a download to see it here')
-        : Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: active
-                .map((item) => SizedBox(
-                      width: 280,
-                      child: _DownloadGridCard(
-                        item: item,
-                        onCancel: () => AppState.instance.cancelDownload(item.id),
-                      ),
-                    ))
-                .toList(),
-          );
+    final inner =
+        active.isEmpty
+            ? _emptyState(
+              'No active downloads',
+              Icons.download_outlined,
+              subtitle: 'Analyze a video and start a download to see it here',
+            )
+            : Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children:
+                  active
+                      .map(
+                        (item) => SizedBox(
+                          width: 260,
+                          child: _DownloadGridCard(
+                            item: item,
+                            onCancel:
+                                () => AppState.instance.cancelDownload(item.id),
+                          ),
+                        ),
+                      )
+                      .toList(),
+            );
     final body = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 250),
       child: inner,
@@ -153,36 +169,53 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     return SectionCard(
       title: 'ACTIVE DOWNLOADS',
       count: '${active.length}',
-      actions: active.isNotEmpty
-          ? [SectionAction(label: 'Clear Done', icon: Icons.clear_all_rounded, onTap: () {})]
-          : null,
+      actions:
+          active.isNotEmpty
+              ? [
+                SectionAction(
+                  label: 'Clear Done',
+                  icon: Icons.clear_all_rounded,
+                  onTap: () {},
+                ),
+              ]
+              : null,
       child: body,
     );
   }
 
   Widget _buildCompletedSection(List<DownloadItem> completed) {
-    final doneCount  = completed.where((d) => d.status == DownloadStatus.done).length;
-    final errorCount = completed.where((d) => d.status == DownloadStatus.error).length;
-    final filtered   = (switch (_completedFilter) {
-      'done'  => completed.where((d) => d.status == DownloadStatus.done).toList(),
-      'error' => completed.where((d) => d.status == DownloadStatus.error).toList(),
-      _       => completed,
-    }).take(10).toList();  // cap at 10 most recent
-    final inner = filtered.isEmpty
-        ? _emptyState('No completed downloads', Icons.check_circle_outline_rounded,
-            subtitle: 'Finished downloads will appear here')
-        : Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: filtered
-                .map((item) => SizedBox(
-                      width: 240,
-                      child: _DownloadGridCard(
-                        item: item,
-                      ),
-                    ))
-                .toList(),
-          );
+    final doneCount =
+        completed.where((d) => d.status == DownloadStatus.done).length;
+    final errorCount =
+        completed.where((d) => d.status == DownloadStatus.error).length;
+    final filtered =
+        (switch (_completedFilter) {
+          'done' =>
+            completed.where((d) => d.status == DownloadStatus.done).toList(),
+          'error' =>
+            completed.where((d) => d.status == DownloadStatus.error).toList(),
+          _ => completed,
+        }).take(10).toList(); // cap at 10 most recent
+    final inner =
+        filtered.isEmpty
+            ? _emptyState(
+              'No completed downloads',
+              Icons.check_circle_outline_rounded,
+              subtitle: 'Finished downloads will appear here',
+            )
+            : Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children:
+                  filtered
+                      .map(
+                        (item) => SizedBox(
+                          width: 200,
+                          child: _DownloadGridCard(item: item),
+                        ),
+                      )
+                      .toList(),
+            );
     final body = ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 250),
       child: inner,
@@ -211,7 +244,6 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           count: errorCount,
           onTap: () => setState(() => _completedFilter = 'error'),
         ),
-
       ],
       child: body,
     );
@@ -235,14 +267,24 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               child: Icon(icon, size: 24, color: AppColors.muted2),
             ),
             const SizedBox(height: 14),
-            Text(label,
-                style: AppTextStyles.outfit(
-                    fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.muted)),
+            Text(
+              label,
+              style: AppTextStyles.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.muted,
+              ),
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: 4),
-              Text(subtitle,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted2)),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.outfit(
+                  fontSize: 11,
+                  color: AppColors.muted2,
+                ),
+              ),
             ],
           ],
         ),
@@ -252,16 +294,21 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
   Widget _buildSessionStats(List<DownloadItem> all) {
     final done = all.where((d) => d.status == DownloadStatus.done).length;
-    final active = all.where((d) => d.status == DownloadStatus.downloading).length;
+    final active =
+        all.where((d) => d.status == DownloadStatus.downloading).length;
     return SectionCard(
       title: 'SESSION STATS',
       child: Column(
         children: [
           Row(
             children: [
-              Expanded(child: StatTile(value: '$active', label: 'Active', unit: '')),
+              Expanded(
+                child: StatTile(value: '$active', label: 'Active', unit: ''),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: StatTile(value: '$done', label: 'Done Today', unit: '')),
+              Expanded(
+                child: StatTile(value: '$done', label: 'Done Today', unit: ''),
+              ),
             ],
           ),
         ],
@@ -352,10 +399,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
             ],
           ),
           const SizedBox(height: 12),
-              SparklineChart(
-            values: active.isNotEmpty && active.first.speedHistory.isNotEmpty
-                ? active.first.speedHistory
-                : const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          SparklineChart(
+            values:
+                active.isNotEmpty && active.first.speedHistory.isNotEmpty
+                    ? active.first.speedHistory
+                    : const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             height: 50,
           ),
         ],
@@ -431,10 +479,26 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
       return ('Complete', Icons.check_circle_rounded, AppColors.green);
     }
     return switch (item.phase) {
-      DownloadPhase.video   => ('Downloading Video', Icons.movie_rounded, AppColors.green),
-      DownloadPhase.audio   => ('Downloading Audio', Icons.music_note_rounded, const Color(0xFF3B82F6)),
-      DownloadPhase.merging => ('Merging', Icons.merge_rounded, const Color(0xFFF59E0B)),
-      DownloadPhase.complete => ('Complete', Icons.check_circle_rounded, AppColors.green),
+      DownloadPhase.video => (
+        'Downloading Video',
+        Icons.movie_rounded,
+        AppColors.green,
+      ),
+      DownloadPhase.audio => (
+        'Downloading Audio',
+        Icons.music_note_rounded,
+        const Color(0xFF3B82F6),
+      ),
+      DownloadPhase.merging => (
+        'Merging',
+        Icons.merge_rounded,
+        const Color(0xFFF59E0B),
+      ),
+      DownloadPhase.complete => (
+        'Complete',
+        Icons.check_circle_rounded,
+        AppColors.green,
+      ),
     };
   }
 
@@ -454,7 +518,8 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
     final ok = await _showConfirmDialog(
       context,
       title: 'Remove Download',
-      body: 'Remove "${widget.item.title}" from history?\n\nThe file stays in your Library.',
+      body:
+          'Remove "${widget.item.title}" from history?\n\nThe file stays in your Library.',
       confirmLabel: 'Remove',
       confirmColor: AppColors.red,
       icon: Icons.delete_outline_rounded,
@@ -466,7 +531,8 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
     final ok = await _showConfirmDialog(
       context,
       title: 'Delete File',
-      body: 'Permanently delete "${widget.item.title}" from your device?\n\nThis cannot be undone.',
+      body:
+          'Permanently delete "${widget.item.title}" from your device?\n\nThis cannot be undone.',
       confirmLabel: 'Delete',
       confirmColor: AppColors.red,
       icon: Icons.delete_forever_rounded,
@@ -487,18 +553,26 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        transform: _hovered
-            ? (Matrix4.identity()..translate(0.0, -4.0))
-            : Matrix4.identity(),
+        transform:
+            _hovered
+                ? (Matrix4.identity()..translate(0.0, -4.0))
+                : Matrix4.identity(),
         decoration: BoxDecoration(
           color: AppColors.surface1,
           borderRadius: BorderRadius.circular(AppColors.radius),
           border: Border.all(
             color: _hovered ? accent.withOpacity(0.45) : AppColors.border,
           ),
-          boxShadow: _hovered
-              ? [BoxShadow(color: accent.withOpacity(0.18), blurRadius: 20, spreadRadius: 2)]
-              : [],
+          boxShadow:
+              _hovered
+                  ? [
+                    BoxShadow(
+                      color: accent.withOpacity(0.18),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ]
+                  : [],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -508,7 +582,8 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
               height: 108,
               child: ClipRRect(
                 borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(AppColors.radius - 1)),
+                  top: Radius.circular(AppColors.radius - 1),
+                ),
                 child: _buildThumbnail(item, accent),
               ),
             ),
@@ -519,14 +594,18 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Title
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                  SizedBox(
+                    height: 32,
+                    child: Text(
+                      item.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        height: 1.3,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -539,18 +618,20 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                         child: Text(
                           phaseLabel,
                           style: AppTextStyles.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: phaseColor),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: phaseColor,
+                          ),
                         ),
                       ),
                       if (_isActive) ...[
                         Text(
                           '$pct%',
                           style: AppTextStyles.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: phaseColor),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: phaseColor,
+                          ),
                         ),
                       ],
                     ],
@@ -562,45 +643,65 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                       tween: Tween(begin: 0, end: item.progress),
                       duration: const Duration(milliseconds: 400),
                       curve: Curves.easeOut,
-                      builder: (_, v, __) => ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(
-                          value: v,
-                          backgroundColor: AppColors.surface2,
-                          valueColor: AlwaysStoppedAnimation(phaseColor),
-                          minHeight: 4,
-                        ),
-                      ),
+                      builder:
+                          (_, v, __) => ClipRRect(
+                            borderRadius: BorderRadius.circular(3),
+                            child: LinearProgressIndicator(
+                              value: v,
+                              backgroundColor: AppColors.surface2,
+                              valueColor: AlwaysStoppedAnimation(phaseColor),
+                              minHeight: 4,
+                            ),
+                          ),
                     ),
                   ],
                   if (_isActive && item.speed != null) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.speed_rounded, size: 10, color: AppColors.muted2),
+                        Icon(
+                          Icons.speed_rounded,
+                          size: 10,
+                          color: AppColors.muted2,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           item.speed!,
                           style: AppTextStyles.outfit(
-                              fontSize: 10, color: AppColors.muted2),
+                            fontSize: 10,
+                            color: AppColors.muted2,
+                          ),
                         ),
                         if (item.fileSize != null) ...[
                           const SizedBox(width: 8),
-                          Icon(Icons.data_usage_rounded, size: 10, color: AppColors.muted2),
+                          Icon(
+                            Icons.data_usage_rounded,
+                            size: 10,
+                            color: AppColors.muted2,
+                          ),
                           const SizedBox(width: 3),
                           Text(
                             item.fileSize!,
-                            style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted2),
+                            style: AppTextStyles.outfit(
+                              fontSize: 10,
+                              color: AppColors.muted2,
+                            ),
                           ),
                         ],
                         if (item.eta != null) ...[
                           const SizedBox(width: 8),
-                          Icon(Icons.timer_outlined, size: 10, color: AppColors.muted2),
+                          Icon(
+                            Icons.timer_outlined,
+                            size: 10,
+                            color: AppColors.muted2,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             item.eta!,
                             style: AppTextStyles.outfit(
-                                fontSize: 10, color: AppColors.muted2),
+                              fontSize: 10,
+                              color: AppColors.muted2,
+                            ),
                           ),
                         ],
                       ],
@@ -610,7 +711,10 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                   // Quality + action buttons row
                   Row(
                     children: [
-                      _QualityBadge(resolution: item.resolution, format: item.format),
+                      _QualityBadge(
+                        resolution: item.resolution,
+                        format: item.format,
+                      ),
                       const Spacer(),
                       if (widget.onCancel != null)
                         _ActionButton(
@@ -619,7 +723,6 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                           color: AppColors.red,
                           onTap: _confirmCancel,
                         ),
-
                     ],
                   ),
                 ],
@@ -694,7 +797,10 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                 Text(
                   _isAudio ? 'AUDIO' : 'VIDEO',
                   style: AppTextStyles.outfit(
-                      fontSize: 10, fontWeight: FontWeight.w800, color: accent),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: accent,
+                  ),
                 ),
               ],
             ),
@@ -712,7 +818,10 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                 color: AppColors.green,
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(color: AppColors.green.withOpacity(0.6), blurRadius: 6)
+                  BoxShadow(
+                    color: AppColors.green.withOpacity(0.6),
+                    blurRadius: 6,
+                  ),
                 ],
               ),
             ),
@@ -722,17 +831,17 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
   }
 
   Widget _gradientBg(Color accent) => Container(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            colors: [
-              accent.withOpacity(0.28),
-              _isAudio ? const Color(0xFF080C18) : const Color(0xFF07110A),
-            ],
-            center: Alignment.center,
-            radius: 1.1,
-          ),
-        ),
-      );
+    decoration: BoxDecoration(
+      gradient: RadialGradient(
+        colors: [
+          accent.withOpacity(0.28),
+          _isAudio ? const Color(0xFF080C18) : const Color(0xFF07110A),
+        ],
+        center: Alignment.center,
+        radius: 1.1,
+      ),
+    ),
+  );
 }
 
 // ── Quality badge ─────────────────────────────────────────────────────────────
@@ -759,7 +868,10 @@ class _QualityBadge extends StatelessWidget {
           child: Text(
             resolution,
             style: AppTextStyles.outfit(
-                fontSize: 10, fontWeight: FontWeight.w700, color: color),
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
           ),
         ),
         const SizedBox(width: 5),
@@ -773,9 +885,10 @@ class _QualityBadge extends StatelessWidget {
           child: Text(
             format.toUpperCase(),
             style: AppTextStyles.outfit(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: AppColors.muted),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.muted,
+            ),
           ),
         ),
       ],
@@ -790,11 +903,12 @@ class _ActionButton extends StatefulWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
-  const _ActionButton(
-      {required this.icon,
-      required this.label,
-      required this.color,
-      required this.onTap});
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   State<_ActionButton> createState() => _ActionButtonState();
@@ -816,14 +930,16 @@ class _ActionButtonState extends State<_ActionButton> {
           margin: const EdgeInsets.only(left: 6),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: _hovered
-                ? widget.color.withOpacity(0.22)
-                : widget.color.withOpacity(0.10),
+            color:
+                _hovered
+                    ? widget.color.withOpacity(0.22)
+                    : widget.color.withOpacity(0.10),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: _hovered
-                  ? widget.color.withOpacity(0.6)
-                  : widget.color.withOpacity(0.28),
+              color:
+                  _hovered
+                      ? widget.color.withOpacity(0.6)
+                      : widget.color.withOpacity(0.28),
             ),
           ),
           child: Row(
@@ -834,9 +950,10 @@ class _ActionButtonState extends State<_ActionButton> {
               Text(
                 widget.label,
                 style: AppTextStyles.outfit(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: widget.color),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: widget.color,
+                ),
               ),
             ],
           ),
@@ -859,78 +976,86 @@ Future<bool> _showConfirmDialog(
   final result = await showDialog<bool>(
     context: context,
     barrierColor: Colors.black.withOpacity(0.6),
-    builder: (ctx) => Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: 360,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.4),
-                blurRadius: 40,
-                spreadRadius: 2)
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: confirmColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: confirmColor.withOpacity(0.30)),
-                  ),
-                  child: Icon(icon, size: 18, color: confirmColor),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: AppTextStyles.outfit(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white),
-                  ),
+    builder:
+        (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: 360,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.4),
+                  blurRadius: 40,
+                  spreadRadius: 2,
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              body,
-              style: AppTextStyles.outfit(
-                  fontSize: 12, color: AppColors.muted, height: 1.5),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _DialogBtn(
-                  label: 'Keep',
-                  onTap: () => Navigator.of(ctx).pop(false),
-                  primary: false,
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: confirmColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: confirmColor.withOpacity(0.30),
+                        ),
+                      ),
+                      child: Icon(icon, size: 18, color: confirmColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: AppTextStyles.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                _DialogBtn(
-                  label: confirmLabel,
-                  color: confirmColor,
-                  onTap: () => Navigator.of(ctx).pop(true),
-                  primary: true,
+                const SizedBox(height: 16),
+                Text(
+                  body,
+                  style: AppTextStyles.outfit(
+                    fontSize: 12,
+                    color: AppColors.muted,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _DialogBtn(
+                      label: 'Keep',
+                      onTap: () => Navigator.of(ctx).pop(false),
+                      primary: false,
+                    ),
+                    const SizedBox(width: 10),
+                    _DialogBtn(
+                      label: confirmLabel,
+                      color: confirmColor,
+                      onTap: () => Navigator.of(ctx).pop(true),
+                      primary: true,
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
   );
   return result ?? false;
 }
@@ -940,11 +1065,12 @@ class _DialogBtn extends StatefulWidget {
   final Color? color;
   final VoidCallback onTap;
   final bool primary;
-  const _DialogBtn(
-      {required this.label,
-      this.color,
-      required this.onTap,
-      required this.primary});
+  const _DialogBtn({
+    required this.label,
+    this.color,
+    required this.onTap,
+    required this.primary,
+  });
 
   @override
   State<_DialogBtn> createState() => _DialogBtnState();
@@ -966,14 +1092,16 @@ class _DialogBtnState extends State<_DialogBtn> {
           duration: const Duration(milliseconds: 130),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
           decoration: BoxDecoration(
-            color: widget.primary
-                ? (_hovered ? c.withOpacity(0.25) : c.withOpacity(0.14))
-                : (_hovered ? AppColors.surface2 : Colors.transparent),
+            color:
+                widget.primary
+                    ? (_hovered ? c.withOpacity(0.25) : c.withOpacity(0.14))
+                    : (_hovered ? AppColors.surface2 : Colors.transparent),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: widget.primary
-                  ? (_hovered ? c.withOpacity(0.7) : c.withOpacity(0.40))
-                  : AppColors.border,
+              color:
+                  widget.primary
+                      ? (_hovered ? c.withOpacity(0.7) : c.withOpacity(0.40))
+                      : AppColors.border,
             ),
           ),
           child: Text(
@@ -1013,12 +1141,12 @@ class _FilterTab extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
         decoration: BoxDecoration(
-          color: selected ? AppColors.green.withOpacity(0.14) : Colors.transparent,
+          color:
+              selected ? AppColors.green.withOpacity(0.14) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected
-                ? AppColors.green.withOpacity(0.40)
-                : AppColors.border,
+            color:
+                selected ? AppColors.green.withOpacity(0.40) : AppColors.border,
           ),
         ),
         child: Row(
@@ -1038,9 +1166,10 @@ class _FilterTab extends StatelessWidget {
                 '$count',
                 style: AppTextStyles.outfit(
                   fontSize: 9,
-                  color: selected
-                      ? AppColors.green.withOpacity(0.75)
-                      : AppColors.muted2,
+                  color:
+                      selected
+                          ? AppColors.green.withOpacity(0.75)
+                          : AppColors.muted2,
                 ),
               ),
             ],
@@ -1071,15 +1200,19 @@ class _ClearAllBtn extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.delete_sweep_rounded, size: 11,
-                color: AppColors.red.withOpacity(0.75)),
+            Icon(
+              Icons.delete_sweep_rounded,
+              size: 11,
+              color: AppColors.red.withOpacity(0.75),
+            ),
             const SizedBox(width: 4),
             Text(
               'Clear All',
               style: AppTextStyles.outfit(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.red.withOpacity(0.75)),
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: AppColors.red.withOpacity(0.75),
+              ),
             ),
           ],
         ),

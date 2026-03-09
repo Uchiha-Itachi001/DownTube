@@ -29,24 +29,28 @@ class _LibraryScreenState extends State<LibraryScreen> {
     return ListenableBuilder(
       listenable: AppState.instance,
       builder: (context, _) {
-        final completed = AppState.instance.downloads
-            .where((d) => d.status == DownloadStatus.done && d.showInLibrary)
-            .toList();
+        final completed =
+            AppState.instance.downloads
+                .where(
+                  (d) => d.status == DownloadStatus.done && d.showInLibrary,
+                )
+                .toList();
 
         List<DownloadItem> filtered;
         if (_activeFilter == 'Video') {
-          filtered = completed.where((d) => !d.resolution.endsWith('k')).toList();
+          filtered =
+              completed.where((d) => !d.resolution.endsWith('k')).toList();
         } else if (_activeFilter == 'Audio') {
-          filtered = completed.where((d) => d.resolution.endsWith('k')).toList();
+          filtered =
+              completed.where((d) => d.resolution.endsWith('k')).toList();
         } else {
           filtered = completed;
         }
 
         final q = _searchCtrl.text.toLowerCase();
         if (q.isNotEmpty) {
-          filtered = filtered
-              .where((d) => d.title.toLowerCase().contains(q))
-              .toList();
+          filtered =
+              filtered.where((d) => d.title.toLowerCase().contains(q)).toList();
         }
 
         return Column(
@@ -54,9 +58,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
             _buildToolbar(completed.length),
             const SizedBox(height: AppColors.gap),
             Expanded(
-              child: filtered.isEmpty
-                  ? _buildEmptyState(completed.isEmpty)
-                  : _buildGrid(filtered),
+              child:
+                  filtered.isEmpty
+                      ? _buildEmptyState(completed.isEmpty)
+                      : _buildGrid(filtered),
             ),
           ],
         );
@@ -77,13 +82,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
               color: AppColors.surface2,
               border: Border.all(color: AppColors.border),
             ),
-            child: const Icon(Icons.video_library_outlined, size: 26, color: AppColors.muted2),
+            child: const Icon(
+              Icons.video_library_outlined,
+              size: 26,
+              color: AppColors.muted2,
+            ),
           ),
           const SizedBox(height: 14),
           Text(
             noneDownloaded ? 'Your library is empty' : 'No results',
             style: AppTextStyles.outfit(
-              fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.muted),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.muted,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
@@ -97,6 +109,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       ),
     );
   }
+
   Widget _buildToolbar(int total) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -143,17 +156,27 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 decoration: InputDecoration(
                   hintText: 'Search library...',
                   hintStyle: AppTextStyles.outfit(
-                      fontSize: 13, color: AppColors.muted),
+                    fontSize: 13,
+                    color: AppColors.muted,
+                  ),
                   prefixIcon: const Padding(
                     padding: EdgeInsets.only(left: 10, right: 6),
-                    child: Icon(Icons.search_rounded, size: 16, color: AppColors.muted),
+                    child: Icon(
+                      Icons.search_rounded,
+                      size: 16,
+                      color: AppColors.muted,
+                    ),
                   ),
-                  prefixIconConstraints:
-                      const BoxConstraints(minWidth: 0, minHeight: 0),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 0,
+                    minHeight: 0,
+                  ),
                   filled: true,
                   fillColor: AppColors.surface2,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(9),
                     borderSide: const BorderSide(color: AppColors.border),
@@ -164,7 +187,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(9),
-                    borderSide: BorderSide(color: AppColors.green.withValues(alpha: 0.4)),
+                    borderSide: BorderSide(
+                      color: AppColors.green.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
               ),
@@ -182,14 +207,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 child: GestureDetector(
                   onTap: () => setState(() => _activeFilter = f),
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: isActive ? AppColors.green : AppColors.surface2,
                       border: Border.all(
-                        color: isActive
-                            ? AppColors.green.withValues(alpha: 0.4)
-                            : AppColors.border,
+                        color:
+                            isActive
+                                ? AppColors.green.withValues(alpha: 0.4)
+                                : AppColors.border,
                       ),
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -219,12 +247,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.sort_rounded, size: 14, color: AppColors.muted),
+                  const Icon(
+                    Icons.sort_rounded,
+                    size: 14,
+                    color: AppColors.muted,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Sort',
                     style: AppTextStyles.outfit(
-                        fontSize: 12, color: AppColors.muted),
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
                   ),
                 ],
               ),
@@ -237,11 +271,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Widget _buildGrid(List<DownloadItem> items) {
     return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
         mainAxisSpacing: AppColors.gap,
         crossAxisSpacing: AppColors.gap,
-        childAspectRatio: 0.78,
+        mainAxisExtent: 245,
       ),
       itemCount: items.length,
       itemBuilder: (context, i) {
@@ -254,7 +288,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
           size: item.fileSize ?? '—',
           isAudio: isAudio,
           thumbnailUrl: item.thumbnailUrl,
-          outputPath: item.filePath.isNotEmpty ? item.filePath : item.outputPath,
+          outputPath:
+              item.filePath.isNotEmpty ? item.filePath : item.outputPath,
         );
       },
     );

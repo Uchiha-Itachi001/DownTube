@@ -33,50 +33,58 @@ class _LibraryCardState extends State<LibraryCard> {
 
   @override
   Widget build(BuildContext context) {
-    final accentColor = widget.gradientColor ??
+    final accentColor =
+        widget.gradientColor ??
         (widget.isAudio ? const Color(0xFF3B82F6) : AppColors.green);
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        transform: _hovered
-            ? (Matrix4.identity()..translate(0.0, -4.0))
-            : Matrix4.identity(),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          border: Border.all(
-            color: _hovered
-                ? accentColor.withOpacity(0.4)
-                : AppColors.green.withOpacity(0.2),
-          ),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: _hovered
-              ? [
-                  BoxShadow(
-                    color: accentColor.withOpacity(0.15),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  )
-                ]
-              : [],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SizedBox(
-              height: 108,
-              child: ClipRRect(
-                borderRadius: BorderRadius.vertical(
-                    top: Radius.circular(AppColors.radius - 1)),
-                child: _buildThumbnail(accentColor),
-              ),
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          transform:
+              _hovered
+                  ? (Matrix4.identity()..translate(0.0, -2.0))
+                  : Matrix4.identity(),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            border: Border.all(
+              color:
+                  _hovered
+                      ? accentColor.withOpacity(0.4)
+                      : AppColors.green.withOpacity(0.2),
             ),
-            _buildInfo(accentColor),
-          ],
+            borderRadius: BorderRadius.circular(14),
+            boxShadow:
+                _hovered
+                    ? [
+                      BoxShadow(
+                        color: accentColor.withOpacity(0.15),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                    : [],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 108,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(AppColors.radius - 1),
+                  ),
+                  child: _buildThumbnail(accentColor),
+                ),
+              ),
+              _buildInfo(accentColor),
+            ],
+          ),
         ),
       ),
     );
@@ -122,15 +130,20 @@ class _LibraryCardState extends State<LibraryCard> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  widget.isAudio ? Icons.music_note_rounded : Icons.movie_rounded,
-                  size: 10,
+                  widget.isAudio
+                      ? Icons.music_note_rounded
+                      : Icons.movie_rounded,
+                  size: 8,
                   color: accentColor,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   widget.isAudio ? 'AUDIO' : 'VIDEO',
                   style: AppTextStyles.outfit(
-                      fontSize: 10, fontWeight: FontWeight.w800, color: accentColor),
+                    fontSize: 8,
+                    fontWeight: FontWeight.w800,
+                    color: accentColor,
+                  ),
                 ),
               ],
             ),
@@ -138,7 +151,7 @@ class _LibraryCardState extends State<LibraryCard> {
         ),
         // Duration — bottom-right
         Positioned(
-          bottom: 7,
+          bottom: 10,
           right: 7,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -166,10 +179,7 @@ class _LibraryCardState extends State<LibraryCard> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            accentColor.withOpacity(0.20),
-            AppColors.surface2,
-          ],
+          colors: [accentColor.withOpacity(0.20), AppColors.surface2],
         ),
       ),
       child: Center(
@@ -184,22 +194,26 @@ class _LibraryCardState extends State<LibraryCard> {
 
   Widget _buildInfo(Color accentColor) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Title
-          Text(
-            widget.title,
-            style: AppTextStyles.outfit(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          SizedBox(
+            height: 32,
+            child: Text(
+              widget.title,
+              style: AppTextStyles.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                height: 1,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           // Meta + size badge row
           Row(
             children: [
@@ -214,7 +228,7 @@ class _LibraryCardState extends State<LibraryCard> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 10),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
@@ -225,7 +239,7 @@ class _LibraryCardState extends State<LibraryCard> {
                 child: Text(
                   widget.size,
                   style: AppTextStyles.outfit(
-                    fontSize: 10,
+                    fontSize: 8,
                     fontWeight: FontWeight.w800,
                     color: accentColor,
                   ),
@@ -233,7 +247,7 @@ class _LibraryCardState extends State<LibraryCard> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
           // File path row
           Row(
             children: [
@@ -260,11 +274,9 @@ class _LibraryCardState extends State<LibraryCard> {
   /// Show only the last 2 path segments with a leading …
   static String _shortPath(String path) {
     if (path.isEmpty) return '—';
-    final segments = path
-        .split(RegExp(r'[\\/]'))
-        .where((s) => s.isNotEmpty)
-        .toList();
+    final segments =
+        path.split(RegExp(r'[\\/]')).where((s) => s.isNotEmpty).toList();
     if (segments.length <= 2) return path;
-    return '…\\${segments.sublist(segments.length - 2).join('\\')}'; 
+    return '…\\${segments.sublist(segments.length - 2).join('\\')}';
   }
 }
