@@ -1,8 +1,10 @@
+﻿import 'dart:io';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
+import '../providers/app_state.dart';
 import '../shell/app_shell.dart';
 import 'startup_controller.dart';
 import 'location_setup_dialog.dart';
@@ -75,11 +77,13 @@ class _SplashScreenState extends State<SplashScreen>
   double get _progressValue {
     switch (_startup.stage) {
       case StartupStage.checking:
-        return 0.40;
+        return 0.35;
       case StartupStage.ytDlpMissing:
-        return 0.45;
+        return 0.40;
       case StartupStage.locationNeeded:
-        return 0.72;
+        return 0.60;
+      case StartupStage.userSetupNeeded:
+        return 0.82;
       case StartupStage.ready:
         return 1.0;
     }
@@ -92,13 +96,13 @@ class _SplashScreenState extends State<SplashScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // ── Background grid ──────────────────────────────────────────────
+          // Background grid
           const CustomPaint(
             size: Size.infinite,
             painter: _BgGridPainter(),
           ),
 
-          // ── Center content ───────────────────────────────────────────────
+          // Center content
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -159,16 +163,22 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ),
 
-          // ── yt-dlp missing overlay ───────────────────────────────────────
+          // yt-dlp missing overlay
           if (_startup.stage == StartupStage.ytDlpMissing)
             _YtDlpMissingPanel(
               onPathSelected: (path) => _startup.retryAfterYtDlpSet(path),
             ),
 
-          // ── Location needed overlay ──────────────────────────────────────
+          // Location needed overlay
           if (_startup.stage == StartupStage.locationNeeded)
             LocationSetupDialog(
               onLocationSet: (path) => _startup.markLocationSet(path),
+            ),
+
+          // User setup overlay
+          if (_startup.stage == StartupStage.userSetupNeeded)
+            _UserSetupPanel(
+              onDone: () => _startup.markUserSetupDone(),
             ),
         ],
       ),
@@ -200,7 +210,7 @@ class _SplashScreenState extends State<SplashScreen>
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.green.withOpacity(
+                    color: AppColors.accent.withOpacity(
                       0.08 + _glowCtrl.value * 0.22,
                     ),
                     blurRadius: 24 + _glowCtrl.value * 20,
@@ -218,7 +228,7 @@ class _SplashScreenState extends State<SplashScreen>
               shape: BoxShape.circle,
               color: AppColors.bg,
               border: Border.all(
-                color: AppColors.green.withOpacity(0.55),
+                color: AppColors.accent.withOpacity(0.55),
                 width: 2,
               ),
             ),
@@ -228,7 +238,7 @@ class _SplashScreenState extends State<SplashScreen>
                 style: AppTextStyles.syne(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.green,
+                  color: AppColors.accent,
                 ),
               ),
             ),
@@ -257,11 +267,11 @@ class _SplashScreenState extends State<SplashScreen>
             width: 220 * _progressValue,
             height: 2,
             decoration: BoxDecoration(
-              color: AppColors.green,
+              color: AppColors.accent,
               borderRadius: BorderRadius.circular(2),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.green.withOpacity(0.5),
+                  color: AppColors.accent.withOpacity(0.5),
                   blurRadius: 6,
                 ),
               ],
@@ -281,15 +291,15 @@ class _SplashScreenState extends State<SplashScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isDone)
-            const Icon(Icons.check_circle_rounded,
-                size: 14, color: AppColors.green)
+            Icon(Icons.check_circle_rounded,
+                size: 14, color: AppColors.accent)
           else
-            const SizedBox(
+            SizedBox(
               width: 14,
               height: 14,
               child: CircularProgressIndicator(
                 strokeWidth: 1.5,
-                color: AppColors.green,
+                color: AppColors.accent,
               ),
             ),
           const SizedBox(width: 8),
@@ -306,8 +316,7 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-// ── Background grid painter ───────────────────────────────────────────────────
-
+// Background grid painter
 class _BgGridPainter extends CustomPainter {
   const _BgGridPainter();
 
@@ -315,10 +324,10 @@ class _BgGridPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     const spacing = 40.0;
     final linePaint = Paint()
-      ..color = AppColors.green.withOpacity(0.035)
+      ..color = AppColors.accent.withOpacity(0.035)
       ..strokeWidth = 0.5;
     final dotPaint = Paint()
-      ..color = AppColors.green.withOpacity(0.10);
+      ..color = AppColors.accent.withOpacity(0.10);
 
     for (double x = 0; x <= size.width; x += spacing) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), linePaint);
@@ -337,8 +346,7 @@ class _BgGridPainter extends CustomPainter {
   bool shouldRepaint(_BgGridPainter old) => false;
 }
 
-// ── Pulse ring painter ────────────────────────────────────────────────────────
-
+// Pulse ring painter
 class _PulseRingPainter extends CustomPainter {
   final double t;
   _PulseRingPainter(this.t);
@@ -356,7 +364,7 @@ class _PulseRingPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5
-        ..color = AppColors.green.withOpacity(opacity),
+        ..color = AppColors.accent.withOpacity(opacity),
     );
   }
 
@@ -364,8 +372,7 @@ class _PulseRingPainter extends CustomPainter {
   bool shouldRepaint(_PulseRingPainter old) => old.t != t;
 }
 
-// ── Arc painter ───────────────────────────────────────────────────────────────
-
+// Arc painter
 class _ArcPainter extends CustomPainter {
   final double value;
   _ArcPainter(this.value);
@@ -381,7 +388,7 @@ class _ArcPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
-        ..color = AppColors.green.withOpacity(0.12),
+        ..color = AppColors.accent.withOpacity(0.12),
     );
 
     canvas.drawArc(
@@ -393,7 +400,7 @@ class _ArcPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.5
         ..strokeCap = StrokeCap.round
-        ..color = AppColors.green,
+        ..color = AppColors.accent,
     );
   }
 
@@ -401,65 +408,7 @@ class _ArcPainter extends CustomPainter {
   bool shouldRepaint(_ArcPainter old) => old.value != value;
 }
 
-// ── Status dot ────────────────────────────────────────────────────────────────
-
-class _StatusDot extends StatelessWidget {
-  final StartupStage stage;
-  const _StatusDot({required this.stage});
-
-  @override
-  Widget build(BuildContext context) {
-    final Color color;
-    final String label;
-
-    switch (stage) {
-      case StartupStage.checking:
-        color = AppColors.yellow;
-        label = 'Checking';
-      case StartupStage.ytDlpMissing:
-        color = AppColors.red;
-        label = 'Engine Missing';
-      case StartupStage.locationNeeded:
-        color = AppColors.yellow;
-        label = 'Setup Required';
-      case StartupStage.ready:
-        color = AppColors.green;
-        label = 'Ready';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        border: Border.all(color: color.withOpacity(0.30)),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: color, blurRadius: 6)],
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(label,
-              style: AppTextStyles.outfit(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: color)),
-        ],
-      ),
-    );
-  }
-}
-
-// ── yt-dlp missing panel ──────────────────────────────────────────────────────
-
+// yt-dlp missing panel
 class _YtDlpMissingPanel extends StatefulWidget {
   final void Function(String path) onPathSelected;
   const _YtDlpMissingPanel({required this.onPathSelected});
@@ -554,11 +503,11 @@ class _YtDlpMissingPanelState extends State<_YtDlpMissingPanel> {
                       horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
                     color: _selectedPath != null
-                        ? AppColors.greenDim
+                        ? AppColors.accentDim
                         : AppColors.surface2,
                     border: Border.all(
                       color: _selectedPath != null
-                          ? AppColors.green.withOpacity(0.50)
+                          ? AppColors.accent.withOpacity(0.50)
                           : AppColors.border,
                     ),
                     borderRadius: BorderRadius.circular(12),
@@ -571,7 +520,7 @@ class _YtDlpMissingPanelState extends State<_YtDlpMissingPanel> {
                             : Icons.folder_open_rounded,
                         size: 18,
                         color: _selectedPath != null
-                            ? AppColors.green
+                            ? AppColors.accent
                             : AppColors.muted,
                       ),
                       const SizedBox(width: 10),
@@ -587,11 +536,11 @@ class _YtDlpMissingPanelState extends State<_YtDlpMissingPanel> {
                         ),
                       ),
                       if (_picking)
-                        const SizedBox(
+                          SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.green),
+                              strokeWidth: 2, color: AppColors.accent),
                         ),
                     ],
                   ),
@@ -608,7 +557,7 @@ class _YtDlpMissingPanelState extends State<_YtDlpMissingPanel> {
                     padding: const EdgeInsets.symmetric(vertical: 13),
                     decoration: BoxDecoration(
                       color: _selectedPath != null
-                          ? AppColors.green
+                          ? AppColors.accent
                           : AppColors.surface3,
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -621,6 +570,302 @@ class _YtDlpMissingPanelState extends State<_YtDlpMissingPanel> {
                           color: _selectedPath != null
                               ? Colors.black
                               : AppColors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// User setup panel – first-time profile setup
+class _UserSetupPanel extends StatefulWidget {
+  final VoidCallback onDone;
+  const _UserSetupPanel({required this.onDone});
+
+  @override
+  State<_UserSetupPanel> createState() => _UserSetupPanelState();
+}
+
+class _UserSetupPanelState extends State<_UserSetupPanel> {
+  final _firstCtrl = TextEditingController();
+  final _lastCtrl = TextEditingController();
+  String? _picPath;
+  bool _valid = false;
+
+  void _checkValid() {
+    setState(() {
+      _valid = _firstCtrl.text.trim().isNotEmpty;
+    });
+  }
+
+  Future<void> _pickPicture() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (result != null && result.files.single.path != null) {
+      setState(() => _picPath = result.files.single.path!);
+    }
+  }
+
+  Future<void> _finish() async {
+    await AppState.instance.setUserProfile(
+      firstName: _firstCtrl.text.trim(),
+      lastName: _lastCtrl.text.trim(),
+    );
+    if (_picPath != null) {
+      await AppState.instance.setUserProfilePicture(_picPath!);
+    }
+    widget.onDone();
+  }
+
+  @override
+  void dispose() {
+    _firstCtrl.dispose();
+    _lastCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.black.withOpacity(0.75),
+      child: Center(
+        child: Container(
+          width: 440,
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: AppColors.surface1,
+            border: Border.all(color: AppColors.accent.withOpacity(0.30)),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withOpacity(0.06),
+                blurRadius: 60,
+                spreadRadius: 8,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.accentDim,
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(
+                          color: AppColors.accent.withOpacity(0.30)),
+                    ),
+                    child: Icon(Icons.person_rounded,
+                        color: AppColors.accent, size: 20),
+                  ),
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Welcome to DownTube',
+                          style: AppTextStyles.syne(
+                              fontSize: 16, fontWeight: FontWeight.w700)),
+                      Text("Let's set up your profile",
+                          style: AppTextStyles.outfit(
+                              fontSize: 12, color: AppColors.muted)),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // Profile picture
+              Center(
+                child: GestureDetector(
+                  onTap: _pickPicture,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: AppColors.accentDim,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.accent.withOpacity(0.40),
+                              width: 2,
+                            ),
+                            image: _picPath != null
+                                ? DecorationImage(
+                                    image:
+                                        FileImage(File(_picPath!)),
+                                    fit: BoxFit.cover,
+                                  )
+                                : null,
+                          ),
+                          child: _picPath == null
+                              ? Icon(Icons.add_a_photo_rounded,
+                                  size: 28,
+                                  color: AppColors.accent.withOpacity(0.6))
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: AppColors.surface1, width: 2),
+                            ),
+                            child: const Icon(Icons.edit_rounded,
+                                size: 12, color: Colors.black),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Center(
+                child: Text(
+                  'Optional',
+                  style: AppTextStyles.outfit(
+                      fontSize: 10, color: AppColors.muted),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // First name
+              Text('First Name *',
+                  style: AppTextStyles.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.muted)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _firstCtrl,
+                onChanged: (_) => _checkValid(),
+                style: AppTextStyles.outfit(
+                    fontSize: 13, fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  filled: true,
+                  fillColor: AppColors.surface2,
+                  hintText: 'Enter your first name',
+                  hintStyle:
+                      AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        BorderSide(color: AppColors.accent.withOpacity(0.20)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        BorderSide(color: AppColors.accent.withOpacity(0.60)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              // Last name
+              Text('Last Name',
+                  style: AppTextStyles.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.muted)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _lastCtrl,
+                style: AppTextStyles.outfit(
+                    fontSize: 13, fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  filled: true,
+                  fillColor: AppColors.surface2,
+                  hintText: 'Optional',
+                  hintStyle:
+                      AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        BorderSide(color: AppColors.accent.withOpacity(0.20)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide:
+                        BorderSide(color: AppColors.accent.withOpacity(0.60)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Privacy note
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.accentDim,
+                  border:
+                      Border.all(color: AppColors.accent.withOpacity(0.15)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_rounded,
+                        size: 16, color: AppColors.accent),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'All data stays local — open source, nothing leaves your device.',
+                        style: AppTextStyles.outfit(
+                          fontSize: 11,
+                          color: AppColors.accent.withOpacity(0.8),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 22),
+              // Continue button
+              SizedBox(
+                width: double.infinity,
+                child: GestureDetector(
+                  onTap: _valid ? _finish : null,
+                  child: MouseRegion(
+                    cursor: _valid
+                        ? SystemMouseCursors.click
+                        : SystemMouseCursors.basic,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      decoration: BoxDecoration(
+                        color:
+                            _valid ? AppColors.accent : AppColors.surface3,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Get Started',
+                          style: AppTextStyles.syne(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: _valid ? Colors.black : AppColors.muted,
+                          ),
                         ),
                       ),
                     ),

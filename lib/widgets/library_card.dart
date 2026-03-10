@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 
@@ -37,7 +37,7 @@ class _LibraryCardState extends State<LibraryCard> {
   Widget build(BuildContext context) {
     final accentColor =
         widget.gradientColor ??
-        (widget.isAudio ? const Color(0xFF3B82F6) : AppColors.green);
+        (widget.isAudio ? const Color(0xFF3B82F6) : AppColors.accent);
 
     return Padding(
       padding: const EdgeInsets.only(top: 8.0),
@@ -59,7 +59,7 @@ class _LibraryCardState extends State<LibraryCard> {
               color:
                   _hovered
                       ? accentColor.withOpacity(0.4)
-                      : AppColors.green.withOpacity(0.2),
+                      : AppColors.accent.withOpacity(0.2),
             ),
             borderRadius: BorderRadius.circular(14),
             boxShadow:

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 
@@ -44,7 +44,7 @@ class StatTile extends StatelessWidget {
                     unit!,
                     style: AppTextStyles.outfit(
                       fontSize: 12,
-                      color: AppColors.green,
+                      color: AppColors.accent,
                     ),
                   ),
                 ),

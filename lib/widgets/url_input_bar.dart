@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
@@ -97,27 +97,27 @@ class _UrlInputBarState extends State<UrlInputBar> {
                 : const Color(0xFF080C09).withOpacity(0.55),
             border: Border.all(
               color: _focused
-                  ? AppColors.green.withOpacity(0.85)
-                  : AppColors.green.withOpacity(0.3),
+                  ? AppColors.accent.withOpacity(0.85)
+                  : AppColors.accent.withOpacity(0.3),
               width: _focused ? 1.5 : 1.0,
             ),
             borderRadius: BorderRadius.circular(14),
             boxShadow: _focused
                 ? [
                     BoxShadow(
-                      color: AppColors.green.withOpacity(0.18),
+                      color: AppColors.accent.withOpacity(0.18),
                       blurRadius: 22,
                       spreadRadius: 2,
                     ),
                     BoxShadow(
-                      color: AppColors.green.withOpacity(0.08),
+                      color: AppColors.accent.withOpacity(0.08),
                       blurRadius: 40,
                       spreadRadius: 5,
                     ),
                   ]
                 : [
                     BoxShadow(
-                      color: AppColors.green.withOpacity(0.06),
+                      color: AppColors.accent.withOpacity(0.06),
                       blurRadius: 12,
                     ),
                   ],
@@ -125,7 +125,7 @@ class _UrlInputBarState extends State<UrlInputBar> {
           child: Row(
             children: [
               Icon(Icons.link, size: 16,
-                  color: _focused ? AppColors.green.withOpacity(0.7) : AppColors.muted),
+                  color: _focused ? AppColors.accent.withOpacity(0.7) : AppColors.muted),
               const SizedBox(width: 10),
               Expanded(
                 child: TextField(
@@ -155,7 +155,7 @@ class _UrlInputBarState extends State<UrlInputBar> {
             ],
           ),
         ),
-        // ── Inline fused status card ──────────────────────────────
+        // Inline fused status card
         if (widget.statusMessage != null && widget.statusMessage!.isNotEmpty) ...[
           const SizedBox(height: 10),
           AppNotificationCard(
@@ -191,9 +191,9 @@ class _PasteButtonState extends State<_PasteButton> {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: _hovered ? AppColors.green.withOpacity(0.08) : Colors.transparent,
+            color: _hovered ? AppColors.accent.withOpacity(0.08) : Colors.transparent,
             border: Border.all(
-              color: _hovered ? AppColors.green : AppColors.green.withOpacity(0.40),
+              color: _hovered ? AppColors.accent : AppColors.accent.withOpacity(0.40),
             ),
             borderRadius: BorderRadius.circular(9),
           ),
@@ -201,14 +201,14 @@ class _PasteButtonState extends State<_PasteButton> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.content_paste_rounded, size: 12,
-                  color: _hovered ? AppColors.green : AppColors.green.withOpacity(0.7)),
+                  color: _hovered ? AppColors.accent : AppColors.accent.withOpacity(0.7)),
               const SizedBox(width: 5),
               Text(
                 'Paste',
                 style: AppTextStyles.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: _hovered ? AppColors.green : AppColors.green.withOpacity(0.7),
+                  color: _hovered ? AppColors.accent : AppColors.accent.withOpacity(0.7),
                 ),
               ),
             ],
@@ -246,11 +246,11 @@ class _AnalyzeButtonState extends State<_AnalyzeButton> {
             vertical: widget.compact ? 7 : 9,
           ),
           decoration: BoxDecoration(
-            color: AppColors.green,
+            color: AppColors.accent,
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: AppColors.greenGlow,
+                color: AppColors.accentGlow,
                 blurRadius: _hovered ? 28 : 20,
                 offset: Offset(0, _hovered ? 6 : 4),
               ),

@@ -645,6 +645,8 @@ class _DownloadScreenState extends State<DownloadScreen> {
         '-f',
         formatToUse,
         '--no-warnings',
+        '--remote-components',
+        'ejs:github',
         videoUrl,
       ]).timeout(const Duration(seconds: 10));
 
@@ -698,6 +700,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
       if (isPlaylistUrl) {
         args.add('--flat-playlist');
       }
+      args.addAll(['--remote-components', 'ejs:github']);
 
       final process = await Process.start('yt-dlp', args + [url]);
       final completer = Completer<ProcessResult>();
@@ -870,6 +873,8 @@ class _DownloadScreenState extends State<DownloadScreen> {
         '-f',
         _format,
         '--no-warnings',
+        '--remote-components',
+        'ejs:github',
         _urlController.text,
       ]).timeout(const Duration(seconds: 10));
 
@@ -968,6 +973,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
         }
       }
 
+      args.addAll(['--remote-components', 'ejs:github']);
       args.add(videoUrl);
 
       final process = await Process.start('yt-dlp', args);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import '../core/app_colors.dart';
 import '../models/video_info.dart';
 import '../models/download_item.dart';
 import '../services/prefs_service.dart';
@@ -8,8 +9,7 @@ import '../services/download_db.dart';
 
 enum FetchState { idle, loading, success, error }
 
-// ── Phase notifications (consumed by UI to show overlay cards) ────────────────
-
+// Phase notifications (consumed by UI to show overlay cards)
 enum DownloadNotifType { videoPhase, audioPhase, mergeDone }
 
 class DownloadNotification {
@@ -27,25 +27,72 @@ class AppState extends ChangeNotifier {
   static final AppState instance = AppState._();
   AppState._();
 
-  // ── Services ──────────────────────────────────────────────────────────────
+  // Services
   PrefsService? _prefs;
   final YtDlpService ytDlp = YtDlpService();
 
-  // ── Engine status ─────────────────────────────────────────────────────────
+  // Engine status
   bool ytDlpReady = false;
   String? ytDlpVersion;
   String? downloadPath;
 
-  // ── Video fetch state ─────────────────────────────────────────────────────
+  // Theme color (accent)
+  Color themeColor = AppColors.accent;
+
+  // User profile
+  String? userFirstName;
+  String? userLastName;
+  String? userProfilePic;
+  bool userSetupDone = false;
+
+  String get userDisplayName {
+    final first = userFirstName ?? '';
+    final last = userLastName ?? '';
+    if (first.isEmpty && last.isEmpty) return 'User';
+    return '$first $last'.trim();
+  }
+
+  String get userInitial {
+    if (userFirstName != null && userFirstName!.isNotEmpty) {
+      return userFirstName![0].toUpperCase();
+    }
+    return 'U';
+  }
+
+  // Download settings (persisted)
+  bool autoDownload = true;
+  bool embedSubs = true;
+  bool saveThumbnail = true;
+  bool addChapters = false;
+  bool autoUpdateYtDlp = true;
+  bool notificationsEnabled = true;
+  bool soundEffects = false;
+
+  // Video defaults (persisted)
+  String defaultQuality = '1080p';
+  String defaultFormat = 'MP4';
+
+  // Audio defaults (persisted)
+  String defaultAudioFormat = 'MP3';
+  String audioBitrate = '320 kbps';
+
+  Future<void> setThemeColor(Color color) async {
+    themeColor = color;
+    AppColors.accent = color;
+    await _prefs?.setThemeColor(color);
+    notifyListeners();
+  }
+
+  // Video fetch state
   FetchState fetchState = FetchState.idle;
   VideoInfo? videoInfo;
   String? fetchError;
   String? currentUrl;
 
-  // ── Downloads ─────────────────────────────────────────────────────────────
+  // Downloads
   final List<DownloadItem> downloads = [];
 
-  // ── Phase notifications (UI drains this queue after notifyListeners) ───────
+  // Phase notifications (UI drains this queue after notifyListeners)
   final List<DownloadNotification> pendingNotifications = [];
 
   List<DownloadNotification> drainNotifications() {
@@ -55,7 +102,7 @@ class AppState extends ChangeNotifier {
     return out;
   }
 
-  // ── Initialisation ────────────────────────────────────────────────────────
+  // Initialisation
   bool _initialized = false;
 
   Future<void> init() async {
@@ -64,6 +111,32 @@ class AppState extends ChangeNotifier {
 
     _prefs = await PrefsService.create();
     downloadPath = _prefs!.downloadPath;
+
+    // Load saved theme color and apply it globally
+    final savedColor = _prefs!.themeColor;
+    if (savedColor != null) {
+      themeColor = savedColor;
+      AppColors.accent = savedColor;
+    }
+
+    // Load user profile
+    userFirstName = _prefs!.userFirstName;
+    userLastName = _prefs!.userLastName;
+    userProfilePic = _prefs!.userProfilePic;
+    userSetupDone = _prefs!.userSetupDone;
+
+    // Load persisted settings
+    autoDownload = _prefs!.autoDownload;
+    embedSubs = _prefs!.embedSubs;
+    saveThumbnail = _prefs!.saveThumbnail;
+    addChapters = _prefs!.addChapters;
+    autoUpdateYtDlp = _prefs!.autoUpdateYtDlp;
+    notificationsEnabled = _prefs!.notifications;
+    soundEffects = _prefs!.soundEffects;
+    defaultQuality = _prefs!.defaultQuality;
+    defaultFormat = _prefs!.defaultFormat;
+    defaultAudioFormat = _prefs!.defaultAudioFormat;
+    audioBitrate = _prefs!.audioBitrate;
 
     ytDlpReady =
         await ytDlp.detectPath(savedPath: _prefs!.ytDlpPath);
@@ -111,7 +184,7 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     } catch (_) {}
   }
-  // ── Fetch video ───────────────────────────────────────────────────────────
+  // Fetch video
   Future<void> fetchVideo(String url) async {
     currentUrl = url;
     fetchState = FetchState.loading;
@@ -141,7 +214,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Downloads ─────────────────────────────────────────────────────────────
+  // Downloads
   void enqueueDownload(DownloadItem item) {
     downloads.insert(0, item);
     notifyListeners();
@@ -340,7 +413,7 @@ class AppState extends ChangeNotifier {
     return val; // already KB/s
   }
 
-  // ── Cancel download ───────────────────────────────────────────────────────
+  // Cancel download
   Future<void> cancelDownload(String id) async {
     ytDlp.killDownload(id);
     final idx = downloads.indexWhere((d) => d.id == id);
@@ -396,15 +469,14 @@ class AppState extends ChangeNotifier {
     return removed;
   }
 
-  // ── Settings ──────────────────────────────────────────────────────────────
+  // Settings
   Future<void> setDownloadPath(String path) async {
     downloadPath = path;
     await _prefs?.setDownloadPath(path);
     notifyListeners();
   }
 
-  // ── Storage stats ─────────────────────────────────────────────────────────
-
+  // Storage stats
   /// Total bytes of all completed downloads.
   int get totalStorageBytes {
     int total = 0;
@@ -454,6 +526,96 @@ class AppState extends ChangeNotifier {
     final found = await ytDlp.detectPath(savedPath: path);
     ytDlpReady = found;
     if (found) ytDlpVersion = await ytDlp.getVersion();
+    notifyListeners();
+  }
+
+  // User profile setters
+  Future<void> setUserProfile({
+    required String firstName,
+    required String lastName,
+    String? profilePic,
+  }) async {
+    userFirstName = firstName;
+    userLastName = lastName;
+    userProfilePic = profilePic;
+    userSetupDone = true;
+    await _prefs?.setUserFirstName(firstName);
+    await _prefs?.setUserLastName(lastName);
+    if (profilePic != null) await _prefs?.setUserProfilePic(profilePic);
+    await _prefs?.setUserSetupDone(true);
+    notifyListeners();
+  }
+
+  Future<void> setUserProfilePicture(String path) async {
+    userProfilePic = path;
+    await _prefs?.setUserProfilePic(path);
+    notifyListeners();
+  }
+
+  // Setting setters (persisted)
+  Future<void> setAutoDownload(bool v) async {
+    autoDownload = v;
+    await _prefs?.setAutoDownload(v);
+    notifyListeners();
+  }
+
+  Future<void> setEmbedSubs(bool v) async {
+    embedSubs = v;
+    await _prefs?.setEmbedSubs(v);
+    notifyListeners();
+  }
+
+  Future<void> setSaveThumbnail(bool v) async {
+    saveThumbnail = v;
+    await _prefs?.setSaveThumbnail(v);
+    notifyListeners();
+  }
+
+  Future<void> setAddChapters(bool v) async {
+    addChapters = v;
+    await _prefs?.setAddChapters(v);
+    notifyListeners();
+  }
+
+  Future<void> setAutoUpdateYtDlp(bool v) async {
+    autoUpdateYtDlp = v;
+    await _prefs?.setAutoUpdateYtDlp(v);
+    notifyListeners();
+  }
+
+  Future<void> setNotificationsEnabled(bool v) async {
+    notificationsEnabled = v;
+    await _prefs?.setNotifications(v);
+    notifyListeners();
+  }
+
+  Future<void> setSoundEffects(bool v) async {
+    soundEffects = v;
+    await _prefs?.setSoundEffects(v);
+    notifyListeners();
+  }
+
+  Future<void> setDefaultQuality(String v) async {
+    defaultQuality = v;
+    await _prefs?.setDefaultQuality(v);
+    notifyListeners();
+  }
+
+  Future<void> setDefaultFormat(String v) async {
+    defaultFormat = v;
+    await _prefs?.setDefaultFormat(v);
+    notifyListeners();
+  }
+
+  Future<void> setDefaultAudioFormat(String v) async {
+    defaultAudioFormat = v;
+    await _prefs?.setDefaultAudioFormat(v);
+    notifyListeners();
+  }
+
+  Future<void> setAudioBitrate(String v) async {
+    audioBitrate = v;
+    await _prefs?.setAudioBitrate(v);
     notifyListeners();
   }
 }

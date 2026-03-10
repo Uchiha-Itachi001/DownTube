@@ -105,8 +105,7 @@ class VideoInfo {
     );
   }
 
-  // ── Formatters ────────────────────────────────────────────────────────────
-
+  // Formatters
   String get formattedDuration {
     if (duration == null) return '--:--';
     final d = duration!;

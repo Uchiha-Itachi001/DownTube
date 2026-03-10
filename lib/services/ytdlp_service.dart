@@ -77,7 +77,7 @@ class YtDlpService {
 
     final process = await Process.start(
       _execPath!,
-      ['-J', '--no-warnings', '--no-playlist', url],
+      ['-J', '--no-warnings', '--no-playlist', '--remote-components', 'ejs:github', url],
       runInShell: false,
     );
 
@@ -130,6 +130,7 @@ class YtDlpService {
         '--no-playlist',
         '--no-warnings',
         '--force-overwrites',
+        '--remote-components', 'ejs:github',
         url,
       ];
     } else {
@@ -140,6 +141,7 @@ class YtDlpService {
         '--no-playlist',
         '--no-warnings',
         '--force-overwrites',
+        '--remote-components', 'ejs:github',
         url,
       ];
     }
@@ -185,8 +187,7 @@ class YtDlpService {
   }
 }
 
-// ── yt-dlp error message parser ──────────────────────────────────────────────
-
+// yt-dlp error message parser
 String _friendlyYtDlpError(String stderr, int exitCode) {
   if (exitCode == -1) {
     return 'Request timed out. Check your internet connection.';

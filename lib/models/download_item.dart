@@ -93,8 +93,7 @@ class DownloadItem {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  // ── Database serialisation ────────────────────────────────────────────────
-
+  // Database serialisation
   Map<String, dynamic> toDbMap() => {
         'id': id,
         'title': title,

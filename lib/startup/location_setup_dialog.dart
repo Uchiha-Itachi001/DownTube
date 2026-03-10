@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+﻿import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
@@ -58,11 +58,11 @@ class _LocationSetupDialogState extends State<LocationSetupDialog>
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
               color: AppColors.surface1,
-              border: Border.all(color: AppColors.green.withOpacity(0.30)),
+              border: Border.all(color: AppColors.accent.withOpacity(0.30)),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.green.withOpacity(0.08),
+                  color: AppColors.accent.withOpacity(0.08),
                   blurRadius: 60,
                   spreadRadius: 8,
                 ),
@@ -79,13 +79,13 @@ class _LocationSetupDialogState extends State<LocationSetupDialog>
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: AppColors.greenDim,
+                        color: AppColors.accentDim,
                         borderRadius: BorderRadius.circular(11),
                         border: Border.all(
-                            color: AppColors.green.withOpacity(0.35)),
+                            color: AppColors.accent.withOpacity(0.35)),
                       ),
-                      child: const Icon(Icons.folder_open_rounded,
-                          color: AppColors.green, size: 20),
+                      child: Icon(Icons.folder_open_rounded,
+                          color: AppColors.accent, size: 20),
                     ),
                     const SizedBox(width: 14),
                     Column(
@@ -116,11 +116,11 @@ class _LocationSetupDialogState extends State<LocationSetupDialog>
                         horizontal: 14, vertical: 13),
                     decoration: BoxDecoration(
                       color: _selectedPath != null
-                          ? AppColors.greenDim
+                          ? AppColors.accentDim
                           : AppColors.surface2,
                       border: Border.all(
                         color: _selectedPath != null
-                            ? AppColors.green.withOpacity(0.50)
+                            ? AppColors.accent.withOpacity(0.50)
                             : AppColors.border,
                       ),
                       borderRadius: BorderRadius.circular(12),
@@ -133,7 +133,7 @@ class _LocationSetupDialogState extends State<LocationSetupDialog>
                               : Icons.folder_rounded,
                           size: 18,
                           color: _selectedPath != null
-                              ? AppColors.green
+                              ? AppColors.accent
                               : AppColors.muted,
                         ),
                         const SizedBox(width: 10),
@@ -150,12 +150,12 @@ class _LocationSetupDialogState extends State<LocationSetupDialog>
                           ),
                         ),
                         if (_picking)
-                          const SizedBox(
+                          SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: AppColors.green,
+                              color: AppColors.accent,
                             ),
                           )
                         else
@@ -216,13 +216,13 @@ class _ConfirmButtonState extends State<_ConfirmButton> {
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
             color: widget.enabled
-                ? AppColors.green
+                ? AppColors.accent
                 : AppColors.surface3,
             borderRadius: BorderRadius.circular(12),
             boxShadow: widget.enabled
                 ? [
                     BoxShadow(
-                      color: AppColors.greenGlow.withOpacity(_hov ? 0.5 : 0.28),
+                      color: AppColors.accentGlow.withOpacity(_hov ? 0.5 : 0.28),
                       blurRadius: _hov ? 28 : 18,
                       offset: Offset(0, _hov ? 6 : 3),
                     ),

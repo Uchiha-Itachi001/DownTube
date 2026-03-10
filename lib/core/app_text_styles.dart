@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
@@ -111,12 +111,12 @@ class AppTextStyles {
   static TextStyle get statValue => syne(
         fontSize: 20,
         fontWeight: FontWeight.w800,
-        color: AppColors.green,
+        color: AppColors.accent,
       );
 
   static TextStyle get bigStatValue => syne(
         fontSize: 32,
         fontWeight: FontWeight.w800,
-        color: AppColors.green,
+        color: AppColors.accent,
       );
 }

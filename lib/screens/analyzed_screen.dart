@@ -10,8 +10,7 @@ import '../providers/app_state.dart';
 import '../widgets/app_notification.dart';
 import '../widgets/shimmer_box.dart';
 
-// ─── Quality option ───────────────────────────────────────────────────────────
-
+// Quality option
 class _QOption {
   final String res;
   final String name;
@@ -19,13 +18,13 @@ class _QOption {
   const _QOption(this.res, this.name, {this.badge});
 }
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
-
+// Screen
 class AnalyzedScreen extends StatefulWidget {
   final String? initialUrl;
   final VoidCallback? onDownload;
   final VoidCallback? onQueue;
-  const AnalyzedScreen({super.key, this.initialUrl, this.onDownload, this.onQueue});
+  final VoidCallback? onError;
+  const AnalyzedScreen({super.key, this.initialUrl, this.onDownload, this.onQueue, this.onError});
 
   @override
   State<AnalyzedScreen> createState() => _AnalyzedScreenState();
@@ -36,7 +35,6 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   int _selectedTab = 0; // 0 = Video, 1 = Audio
   String _selectedFormat = 'MP4';
   final Set<String> _checkOptions = {'Save Thumbnail', 'Add Chapters'};
-  bool _showDetails = false;
   String? _outputPath; // per-session output folder (overrides saved default)
   ValueNotifier<bool>? _loadingNotifDismiss;
   final ScrollController _qualityScrollCtrl = ScrollController();
@@ -193,6 +191,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           message: AppState.instance.fetchError ?? 'Failed to fetch video info',
           duration: const Duration(seconds: 6),
         );
+        widget.onError?.call();
       });
     } else if (state == FetchState.loading || state == FetchState.idle) {
       // Reset so the next success/error will fire again.
@@ -281,7 +280,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.surface1,
-              border: Border.all(color: AppColors.green.withOpacity(0.58)),
+              border: Border.all(color: AppColors.accent.withOpacity(0.58)),
               borderRadius: BorderRadius.circular(AppColors.radius),
             ),
             clipBehavior: Clip.antiAlias,
@@ -316,8 +315,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     );
   }
 
-  // ── VIDEO HEADER ───────────────────────────────────────────────────────────
-
+  // VIDEO HEADER
   Widget _buildVerticalSkeleton() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -328,7 +326,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.surface1,
-              border: Border.all(color: AppColors.green.withOpacity(0.12)),
+              border: Border.all(color: AppColors.accent.withOpacity(0.12)),
               borderRadius: BorderRadius.circular(AppColors.radius),
             ),
             clipBehavior: Clip.antiAlias,
@@ -366,7 +364,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.18)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.18)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       clipBehavior: Clip.antiAlias,
@@ -424,16 +422,16 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.72),
-              border: Border.all(color: AppColors.green.withOpacity(0.55)),
+              border: Border.all(color: AppColors.accent.withOpacity(0.55)),
               borderRadius: BorderRadius.circular(5),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.high_quality_rounded,
                   size: 11,
-                  color: AppColors.green,
+                  color: AppColors.accent,
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -441,7 +439,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
                   style: AppTextStyles.spaceGrotesk(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.green,
+                    color: AppColors.accent,
                   ),
                 ),
               ],
@@ -508,13 +506,13 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             ),
           ),
         ),
-        CustomPaint(painter: _GridPainter()),
+        CustomPaint(painter: _GridPainter(AppColors.accent)),
         Container(
           decoration: BoxDecoration(
             gradient: RadialGradient(
               center: Alignment.center,
               radius: 0.7,
-              colors: [AppColors.green.withOpacity(0.12), Colors.transparent],
+              colors: [AppColors.accent.withOpacity(0.12), Colors.transparent],
             ),
           ),
         ),
@@ -600,17 +598,17 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.greenDim,
-        border: Border.all(color: AppColors.green.withOpacity(0.28)),
+        color: AppColors.accentDim,
+        border: Border.all(color: AppColors.accent.withOpacity(0.28)),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.check_circle_rounded,
             size: 11,
-            color: AppColors.green,
+            color: AppColors.accent,
           ),
           const SizedBox(width: 4),
           Text(
@@ -618,7 +616,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             style: AppTextStyles.outfit(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: AppColors.green,
+              color: AppColors.accent,
             ),
           ),
         ],
@@ -636,8 +634,8 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         Container(
           width: 26,
           height: 26,
-          decoration: const BoxDecoration(
-            color: AppColors.green,
+          decoration: BoxDecoration(
+            color: AppColors.accent,
             shape: BoxShape.circle,
           ),
           child: Center(
@@ -652,27 +650,31 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           ),
         ),
         const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              info.channelName ?? '',
-              style: AppTextStyles.outfit(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.green,
-              ),
-            ),
-            if (info.subscriberCount != null)
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Text(
-                info.formattedSubscribers,
+                info.channelName ?? '',
                 style: AppTextStyles.outfit(
-                  fontSize: 10,
-                  color: AppColors.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.accent,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-          ],
+              if (info.subscriberCount != null)
+                Text(
+                  info.formattedSubscribers,
+                  style: AppTextStyles.outfit(
+                    fontSize: 10,
+                    color: AppColors.muted,
+                  ),
+                ),
+            ],
+          ),
         ),
         const Spacer(),
         if (info.viewCount != null)
@@ -722,56 +724,20 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     );
   }
 
-  Widget _buildUrlBar(String url) {
-    final display = url
-        .replaceFirst('https://', '')
-        .replaceFirst('http://', '');
-    return GestureDetector(
-      onTap: () => Clipboard.setData(ClipboardData(text: url)),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(7),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.link_rounded, size: 12, color: AppColors.muted),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                display.isEmpty ? '—' : display,
-                style: AppTextStyles.outfit(
-                  fontSize: 11,
-                  color: AppColors.muted,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.copy_rounded, size: 12, color: AppColors.muted),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildUrlAndPathRow(String url) {
     final display = url
         .replaceFirst('https://', '')
         .replaceFirst('http://', '');
     final path = _outputPath ?? AppState.instance.downloadPath ?? '';
     final displayPath = path.isEmpty ? 'Default folder' : path;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        // URL copy bar
+        // URL copy bar — full width
         GestureDetector(
           onTap: () => Clipboard.setData(ClipboardData(text: url)),
           child: Container(
-            constraints: const BoxConstraints(minWidth: 160),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             decoration: BoxDecoration(
               color: AppColors.surface2,
@@ -779,7 +745,6 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
               border: Border.all(color: AppColors.border),
             ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
                   Icons.link_rounded,
@@ -787,8 +752,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
                   color: AppColors.muted,
                 ),
                 const SizedBox(width: 6),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 220),
+                Flexible(
                   child: Text(
                     display.isEmpty ? '—' : display,
                     style: AppTextStyles.outfit(
@@ -809,13 +773,13 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             ),
           ),
         ),
-        // Folder picker
+        const SizedBox(height: 6),
+        // Folder picker — full width
         GestureDetector(
           onTap: _pickOutputFolder,
           child: MouseRegion(
             cursor: SystemMouseCursors.click,
             child: Container(
-              constraints: const BoxConstraints(minWidth: 120),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
                 color: AppColors.surface2,
@@ -823,16 +787,14 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
                 border: Border.all(color: AppColors.border),
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.folder_outlined,
                     size: 12,
-                    color: AppColors.green,
+                    color: AppColors.accent,
                   ),
                   const SizedBox(width: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 180),
+                  Flexible(
                     child: Text(
                       displayPath,
                       style: AppTextStyles.mono(
@@ -850,10 +812,10 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
                       vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.green.withOpacity(0.10),
+                      color: AppColors.accent.withOpacity(0.10),
                       borderRadius: BorderRadius.circular(5),
                       border: Border.all(
-                        color: AppColors.green.withOpacity(0.35),
+                        color: AppColors.accent.withOpacity(0.35),
                       ),
                     ),
                     child: Text(
@@ -861,7 +823,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
                       style: AppTextStyles.outfit(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.green,
+                        color: AppColors.accent,
                       ),
                     ),
                   ),
@@ -873,16 +835,14 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
       ],
     );
   }
-
-  // ── CONFIG CARD ────────────────────────────────────────────────────────────
-
+  // CONFIG CARD
   Widget _buildConfigCard() {
     if (_isLoading) return _buildConfigCardSkeleton();
     final info = _info;
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.18)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.18)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       padding: const EdgeInsets.all(20),
@@ -890,18 +850,18 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header
+          // Header
           Row(
             children: [
               Container(
                 width: 3,
                 height: 14,
                 decoration: BoxDecoration(
-                  color: AppColors.green,
+                  color: AppColors.accent,
                   borderRadius: BorderRadius.circular(2),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.green.withOpacity(0.6),
+                      color: AppColors.accent.withOpacity(0.6),
                       blurRadius: 8,
                     ),
                   ],
@@ -923,7 +883,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           ),
           const SizedBox(height: 20),
 
-          // ── Quality
+          // Quality
           Row(
             children: [
               _sectionLabel('QUALITY'),
@@ -939,122 +899,77 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           _gradientDivider(),
           const SizedBox(height: 20),
 
-          // ── Format + Options side-by-side
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Format column
-              Column(
+          // Format + Options — responsive layout
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 400;
+
+              final formatButtons = Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: _formats
+                    .map((f) => _formatBtn(f))
+                    .toList(),
+              );
+
+              final optionsSection = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _sectionLabel('FORMAT'),
+                  _sectionLabel('OPTIONS'),
                   const SizedBox(height: 10),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children:
-                        _formats.indexed
-                            .map(
-                              (e) => Padding(
-                                padding: EdgeInsets.only(
-                                  right: e.$1 < _formats.length - 1 ? 8 : 0,
-                                ),
-                                child: _formatBtn(e.$2),
-                              ),
-                            )
-                            .toList(),
+                  Wrap(
+                    spacing: 18,
+                    runSpacing: 10,
+                    children: [
+                      _lockedOption('Save Thumbnail'),
+                      ...(_selectedTab == 0
+                              ? ['Add Chapters', 'Embed Metadata']
+                              : ['Embed Cover Art', 'Embed Metadata'])
+                          .map(_checkOption),
+                    ],
                   ),
                 ],
-              ),
-              const SizedBox(width: 28),
-              Container(width: 1, height: 56, color: AppColors.border),
-              const SizedBox(width: 28),
-              // Options column
-              Expanded(
-                child: Column(
+              );
+
+              if (!wide) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _sectionLabel('OPTIONS'),
+                    _sectionLabel('FORMAT'),
                     const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 18,
-                      runSpacing: 10,
-                      children: [
-                        // Save Thumbnail — always enabled, non-toggleable
-                        _lockedOption('Save Thumbnail'),
-                        ...(_selectedTab == 0
-                                ? ['Add Chapters', 'Embed Metadata']
-                                : ['Embed Cover Art', 'Embed Metadata'])
-                            .map(_checkOption),
-                      ],
-                    ),
+                    formatButtons,
+                    const SizedBox(height: 16),
+                    optionsSection,
                   ],
-                ),
-              ),
-            ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _sectionLabel('FORMAT'),
+                      const SizedBox(height: 10),
+                      formatButtons,
+                    ],
+                  ),
+                  const SizedBox(width: 28),
+                  Container(width: 1, height: 56, color: AppColors.border),
+                  const SizedBox(width: 28),
+                  Expanded(child: optionsSection),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 20),
           _gradientDivider(),
           const SizedBox(height: 14),
         ],
-      ),
-    );
-  }
-
-  Widget _buildFolderRow() {
-    final path = _outputPath ?? AppState.instance.downloadPath ?? '';
-    final displayPath = path.isEmpty ? 'Default folder' : path;
-    return GestureDetector(
-      onTap: _pickOutputFolder,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.folder_outlined,
-                size: 13,
-                color: AppColors.green,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  displayPath,
-                  style: AppTextStyles.mono(
-                    fontSize: 11,
-                    color: AppColors.muted,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.green.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(color: AppColors.green.withOpacity(0.35)),
-                ),
-                child: Text(
-                  'Browse',
-                  style: AppTextStyles.outfit(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.green,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1090,7 +1005,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? AppColors.green : Colors.transparent,
+          color: active ? AppColors.accent : Colors.transparent,
           borderRadius: BorderRadius.circular(7),
         ),
         child: Row(
@@ -1141,7 +1056,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             color: enabled ? AppColors.surface2 : AppColors.surface1,
             border: Border.all(
               color: enabled
-                  ? AppColors.green.withOpacity(0.40)
+                  ? AppColors.accent.withOpacity(0.40)
                   : AppColors.border,
             ),
             borderRadius: BorderRadius.circular(6),
@@ -1150,7 +1065,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             child: Icon(
               icon,
               size: 14,
-              color: enabled ? AppColors.green : AppColors.muted.withOpacity(0.3),
+              color: enabled ? AppColors.accent : AppColors.muted.withOpacity(0.3),
             ),
           ),
         ),
@@ -1177,7 +1092,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         gradient: LinearGradient(
           colors: [
             Colors.transparent,
-            AppColors.green.withOpacity(0.20),
+            AppColors.accent.withOpacity(0.20),
             Colors.transparent,
           ],
         ),
@@ -1194,9 +1109,9 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: sel ? AppColors.green : Colors.transparent,
+          color: sel ? AppColors.accent : Colors.transparent,
           border: Border.all(
-            color: sel ? AppColors.green : AppColors.border,
+            color: sel ? AppColors.accent : AppColors.border,
           ),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -1248,17 +1163,17 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
               width: 15,
               height: 15,
               decoration: BoxDecoration(
-                color: on ? AppColors.green : Colors.transparent,
+                color: on ? AppColors.accent : Colors.transparent,
                 border: Border.all(
                   color:
-                      on ? AppColors.green : AppColors.muted.withOpacity(0.40),
+                      on ? AppColors.accent : AppColors.muted.withOpacity(0.40),
                 ),
                 borderRadius: BorderRadius.circular(4),
                 boxShadow:
                     on
                         ? [
                           BoxShadow(
-                            color: AppColors.green.withOpacity(0.4),
+                            color: AppColors.accent.withOpacity(0.4),
                             blurRadius: 6,
                           ),
                         ]
@@ -1298,12 +1213,12 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           width: 15,
           height: 15,
           decoration: BoxDecoration(
-            color: AppColors.green,
-            border: Border.all(color: AppColors.green),
+            color: AppColors.accent,
+            border: Border.all(color: AppColors.accent),
             borderRadius: BorderRadius.circular(4),
             boxShadow: [
               BoxShadow(
-                color: AppColors.green.withOpacity(0.4),
+                color: AppColors.accent.withOpacity(0.4),
                 blurRadius: 6,
               ),
             ],
@@ -1321,18 +1236,17 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           ),
         ),
         const SizedBox(width: 4),
-        Icon(Icons.lock_rounded, size: 10, color: AppColors.green.withOpacity(0.5)),
+        Icon(Icons.lock_rounded, size: 10, color: AppColors.accent.withOpacity(0.5)),
       ],
     );
   }
 
-  // ── ACTION BAR ─────────────────────────────────────────────────────────────
-
+  // ACTION BAR
   Widget _buildConfigCardSkeleton() {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.12)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.12)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       padding: const EdgeInsets.all(20),
@@ -1382,7 +1296,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
           decoration: BoxDecoration(
             color: AppColors.surface1,
-            border: Border.all(color: AppColors.green.withOpacity(0.18)),
+            border: Border.all(color: AppColors.accent.withOpacity(0.18)),
             borderRadius: BorderRadius.circular(AppColors.radius),
           ),
           child: Row(
@@ -1402,17 +1316,17 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.check_circle_outline_rounded,
                           size: 12,
-                          color: AppColors.green,
+                          color: AppColors.accent,
                         ),
                         const SizedBox(width: 3),
                         Text(
                           'No DRM detected',
                           style: AppTextStyles.outfit(
                             fontSize: 11,
-                            color: AppColors.green,
+                            color: AppColors.accent,
                           ),
                         ),
                       ],
@@ -1445,7 +1359,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
       padding: const EdgeInsets.fromLTRB(18, 13, 18, 13),
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.12)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.12)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: Row(
@@ -1503,7 +1417,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     return confirmed == true;
   }
 
-  // ── Output folder picker ───────────────────────────────────────────────────
+  // Output folder picker
   Future<void> _pickOutputFolder() async {
     final result = await FilePicker.platform.getDirectoryPath(
       initialDirectory: _outputPath,
@@ -1565,14 +1479,14 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 16, vertical: 9),
             decoration: BoxDecoration(
               color:
-                  hov ? AppColors.green.withOpacity(0.07) : Colors.transparent,
-              border: Border.all(color: AppColors.green.withOpacity(0.40)),
+                  hov ? AppColors.accent.withOpacity(0.07) : Colors.transparent,
+              border: Border.all(color: AppColors.accent.withOpacity(0.40)),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 15, color: AppColors.green),
+                Icon(icon, size: 15, color: AppColors.accent),
                 if (!compact) ...[
                   const SizedBox(width: 6),
                   Text(
@@ -1580,7 +1494,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
                     style: AppTextStyles.outfit(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.green,
+                      color: AppColors.accent,
                     ),
                   ),
                 ],
@@ -1598,11 +1512,11 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
             duration: const Duration(milliseconds: 150),
             padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 22, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.green,
+              color: AppColors.accent,
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.greenGlow.withOpacity(hov ? 0.55 : 0.32),
+                  color: AppColors.accentGlow.withOpacity(hov ? 0.55 : 0.32),
                   blurRadius: hov ? 28 : 18,
                   offset: Offset(0, hov ? 6 : 3),
                 ),
@@ -1633,204 +1547,9 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     );
   }
 
-  // ── DETAILS TOGGLE ─────────────────────────────────────────────────────────
-
-  Widget _buildDetailsToggle() {
-    if (_info == null) return const SizedBox.shrink();
-    return GestureDetector(
-      onTap: () => setState(() => _showDetails = !_showDetails),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
-          decoration: BoxDecoration(
-            color: AppColors.surface1,
-            border: Border.all(color: AppColors.green.withOpacity(0.18)),
-            borderRadius: BorderRadius.circular(AppColors.radius),
-          ),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.info_outline_rounded,
-                size: 14,
-                color: AppColors.muted,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Video Details',
-                style: AppTextStyles.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.muted,
-                ),
-              ),
-              const Spacer(),
-              AnimatedRotation(
-                turns: _showDetails ? 0.5 : 0,
-                duration: const Duration(milliseconds: 200),
-                child: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 18,
-                  color: AppColors.muted,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── DETAILS PANEL ──────────────────────────────────────────────────────────
-
-  Widget _buildDetailsPanel(VideoInfo info) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.18)),
-        borderRadius: BorderRadius.circular(AppColors.radius),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ── Stats row ──────────────────────────────────────────────────────
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (info.viewCount != null)
-                _detailChip(
-                  Icons.visibility_outlined,
-                  '${_formatNumber(info.viewCount!)} views',
-                ),
-              if (info.likeCount != null)
-                _detailChip(
-                  Icons.thumb_up_outlined,
-                  '${_formatNumber(info.likeCount!)} likes',
-                ),
-              if (info.formattedDate.isNotEmpty)
-                _detailChip(Icons.calendar_today_outlined, info.formattedDate),
-              _detailChip(Icons.high_quality_outlined, info.bestQualityLabel),
-              _detailChip(Icons.access_time_rounded, info.formattedDuration),
-              if (info.extractor != null && info.extractor!.isNotEmpty)
-                _detailChip(Icons.source_rounded, info.extractor!),
-              _detailChip(
-                Icons.movie_filter_rounded,
-                '${info.formats.length} formats available',
-              ),
-            ],
-          ),
-
-          // ── Description ────────────────────────────────────────────────────
-          if (info.description != null && info.description!.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            _detailSectionLabel('DESCRIPTION'),
-            const SizedBox(height: 8),
-            _ExpandableText(text: info.description!),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _detailSectionLabel(String text) {
-    return Text(
-      text,
-      style: AppTextStyles.outfit(
-        fontSize: 10,
-        fontWeight: FontWeight.w600,
-        color: AppColors.muted,
-        letterSpacing: 1.0,
-      ),
-    );
-  }
-
-  Widget _detailChip(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: AppColors.green),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatNumber(int n) {
-    if (n >= 1000000000) return '${(n / 1000000000).toStringAsFixed(1)}B';
-    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(0)}K';
-    return '$n';
-  }
 }
 
-// ── Expandable description text ───────────────────────────────────────────────
-
-class _ExpandableText extends StatefulWidget {
-  final String text;
-  const _ExpandableText({required this.text});
-
-  @override
-  State<_ExpandableText> createState() => _ExpandableTextState();
-}
-
-class _ExpandableTextState extends State<_ExpandableText> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AnimatedSize(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          child: Text(
-            widget.text,
-            maxLines: _expanded ? null : 3,
-            overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-            style: AppTextStyles.outfit(
-              fontSize: 12,
-              color: AppColors.muted,
-              height: 1.55,
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        GestureDetector(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: Text(
-              _expanded ? 'Show less' : 'Show more',
-              style: AppTextStyles.outfit(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.green,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ── Scrollable quality row with arrow buttons ────────────────────────────────
-
+// Scrollable quality row with arrow buttons
 class _ScrollableQualityRow extends StatefulWidget {
   final List<_QOption> quals;
   final VideoInfo? info;
@@ -1943,8 +1662,7 @@ class _ScrollableQualityRowState extends State<_ScrollableQualityRow> {
   }
 }
 
-// ── Quality tile ─────────────────────────────────────────────────────────────
-
+// Quality tile
 class _QualityTile extends StatefulWidget {
   final String res;
   final String name;
@@ -1990,13 +1708,13 @@ class _QualityTileState extends State<_QualityTile> {
   static Color _accentFor(String res) {
     switch (res) {
       case 'Best':
-        return AppColors.green;
+        return AppColors.accent;
       case '4K':
         return const Color(0xFF8B5CF6);
       case '1440p':
         return AppColors.blue;
       case '1080p':
-        return AppColors.green;
+        return AppColors.accent;
       case '720p':
         return const Color(0xFF0EA5E9);
       case '480p':
@@ -2035,7 +1753,7 @@ class _QualityTileState extends State<_QualityTile> {
                 sel
                     ? accent.withValues(alpha: 0.60)
                     : (_hov
-                        ? AppColors.green.withValues(alpha: 0.20)
+                        ? AppColors.accent.withValues(alpha: 0.20)
                         : AppColors.border),
             width: sel ? 1.5 : 1.0,
           ),
@@ -2185,8 +1903,7 @@ class _QualityTileState extends State<_QualityTile> {
   }
 }
 
-// ── Hover button helper ───────────────────────────────────────────────────────
-
+// Hover button helper
 class _HoverBtn extends StatefulWidget {
   final Widget Function(bool hovered) builder;
   final VoidCallback? onTap;
@@ -2209,15 +1926,17 @@ class _HoverBtnState extends State<_HoverBtn> {
   }
 }
 
-// ── Grid painter ──────────────────────────────────────────────────────────────
-
+// Grid painter
 class _GridPainter extends CustomPainter {
+  final Color color;
+  _GridPainter(this.color);
+
   @override
   void paint(Canvas canvas, Size size) {
     const step = 24.0;
     final paint =
         Paint()
-          ..color = const Color(0xFF22C55E).withOpacity(0.07)
+          ..color = color.withValues(alpha: 0.07)
           ..strokeWidth = 0.5;
     for (double x = 0; x < size.width; x += step) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
@@ -2228,11 +1947,10 @@ class _GridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GridPainter old) => false;
+  bool shouldRepaint(_GridPainter old) => old.color != color;
 }
 
-// ── Platform badge with per-platform colour ───────────────────────────────────
-
+// Platform badge with per-platform colour
 class _PlatformBadge extends StatelessWidget {
   final String? extractor;
   const _PlatformBadge({this.extractor});
@@ -2305,8 +2023,7 @@ class _PlatformBadge extends StatelessWidget {
   }
 }
 
-// ── Re-download confirmation dialog ───────────────────────────────────────────
-
+// Re-download confirmation dialog
 class _RedownloadDialog extends StatelessWidget {
   final String videoTitle;
   final String existingResolution;
@@ -2438,7 +2155,7 @@ class _RedownloadDialog extends StatelessWidget {
                             style: AppTextStyles.outfit(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.green,
+                              color: AppColors.accent,
                             ),
                           ),
                         ],
@@ -2489,7 +2206,7 @@ class _RedownloadDialog extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: AppColors.green,
+                          color: AppColors.accent,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         alignment: Alignment.center,

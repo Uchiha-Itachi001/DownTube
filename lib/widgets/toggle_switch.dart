@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 
 class ToggleSwitch extends StatelessWidget {
@@ -20,10 +20,10 @@ class ToggleSwitch extends StatelessWidget {
         width: 40,
         height: 22,
         decoration: BoxDecoration(
-          color: value ? AppColors.green : AppColors.surface3,
+          color: value ? AppColors.accent : AppColors.surface3,
           borderRadius: BorderRadius.circular(11),
           border: Border.all(
-            color: value ? AppColors.green : AppColors.border,
+            color: value ? AppColors.accent : AppColors.border,
           ),
         ),
         child: AnimatedAlign(

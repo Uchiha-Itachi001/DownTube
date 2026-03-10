@@ -1,3 +1,4 @@
+﻿import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
@@ -46,8 +47,8 @@ class _AppHeaderState extends State<AppHeader> {
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 18),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.25)),
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: Row(
@@ -76,11 +77,11 @@ class _AppHeaderState extends State<AppHeader> {
         ready
             ? (version != null ? 'yt-dlp $version' : 'yt-dlp ready')
             : 'yt-dlp not found';
-    final color = ready ? AppColors.green : AppColors.red;
+    final color = ready ? AppColors.accent : AppColors.red;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: ready ? AppColors.greenDim : AppColors.red.withOpacity(0.08),
+        color: ready ? AppColors.accentDim : AppColors.red.withOpacity(0.08),
         border: Border.all(color: color.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(10),
       ),
@@ -129,13 +130,13 @@ class _AppHeaderState extends State<AppHeader> {
         decoration: BoxDecoration(
           color:
               widget.isRefreshing
-                  ? AppColors.green.withOpacity(0.12)
-                  : AppColors.surface2,
+                  ? AppColors.accent.withOpacity(0.12)
+                  : Colors.transparent,
           border: Border.all(
             color:
                 widget.isRefreshing
-                    ? AppColors.green.withOpacity(0.4)
-                    : AppColors.border,
+                    ? AppColors.accent.withOpacity(0.4)
+                    : AppColors.accent.withOpacity(0.30),
           ),
           borderRadius: BorderRadius.circular(9),
         ),
@@ -152,7 +153,7 @@ class _AppHeaderState extends State<AppHeader> {
                             size: 16,
                             color:
                                 widget.isRefreshing
-                                    ? AppColors.green
+                                    ? AppColors.accent
                                     : AppColors.muted,
                           ),
                         ),
@@ -168,11 +169,14 @@ class _AppHeaderState extends State<AppHeader> {
   }
 
   Widget _buildUserPill() {
+    final state = AppState.instance;
+    final hasPic = state.userProfilePic != null &&
+        File(state.userProfilePic!).existsSync();
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 4, 10, 4),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
-        border: Border.all(color: AppColors.border),
+        color: Colors.transparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.30)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
@@ -182,19 +186,27 @@ class _AppHeaderState extends State<AppHeader> {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              color: AppColors.green,
+              color: hasPic ? Colors.transparent : AppColors.accent,
               borderRadius: BorderRadius.circular(7),
+              image: hasPic
+                  ? DecorationImage(
+                      image: FileImage(File(state.userProfilePic!)),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
             ),
-            child: Center(
-              child: Text(
-                'D',
-                style: AppTextStyles.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
-                ),
-              ),
-            ),
+            child: hasPic
+                ? null
+                : Center(
+                    child: Text(
+                      state.userInitial,
+                      style: AppTextStyles.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
           ),
           const SizedBox(width: 8),
           Column(
@@ -202,7 +214,7 @@ class _AppHeaderState extends State<AppHeader> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'DownTube',
+                state.userDisplayName,
                 style: AppTextStyles.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -213,7 +225,7 @@ class _AppHeaderState extends State<AppHeader> {
                 style: AppTextStyles.outfit(
                   fontSize: 10,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.green,
+                  color: AppColors.accent,
                 ),
               ),
             ],
@@ -250,18 +262,18 @@ class _HamburgerButtonState extends State<_HamburgerButton> {
           height: 34,
           decoration: BoxDecoration(
             color: _hov
-                ? AppColors.green.withOpacity(0.15)
-                : AppColors.green.withOpacity(0.08),
+                ? AppColors.accent.withOpacity(0.15)
+                : AppColors.accent.withOpacity(0.08),
             border: Border.all(
               color: _hov
-                  ? AppColors.green.withOpacity(0.60)
-                  : AppColors.green.withOpacity(0.30),
+                  ? AppColors.accent.withOpacity(0.60)
+                  : AppColors.accent.withOpacity(0.30),
             ),
             borderRadius: BorderRadius.circular(9),
             boxShadow: _hov
                 ? [
                     BoxShadow(
-                      color: AppColors.green.withOpacity(0.25),
+                      color: AppColors.accent.withOpacity(0.25),
                       blurRadius: 12,
                     ),
                   ]
@@ -271,8 +283,8 @@ class _HamburgerButtonState extends State<_HamburgerButton> {
             widget.icon,
             size: 16,
             color: _hov
-                ? AppColors.green
-                : AppColors.green.withOpacity(0.75),
+                ? AppColors.accent
+                : AppColors.accent.withOpacity(0.75),
           ),
         ),
       ),
@@ -281,8 +293,8 @@ class _HamburgerButtonState extends State<_HamburgerButton> {
 }
 
 class _PulsingDot extends StatefulWidget {
-  final Color color;
-  const _PulsingDot({this.color = AppColors.green});
+  final Color? color;
+  const _PulsingDot({this.color});
   @override
   State<_PulsingDot> createState() => _PulsingDotState();
 }
@@ -324,9 +336,9 @@ class _PulsingDotState extends State<_PulsingDot>
               width: 7,
               height: 7,
               decoration: BoxDecoration(
-                color: widget.color,
+                color: widget.color ?? AppColors.accent,
                 shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: widget.color, blurRadius: 8)],
+                boxShadow: [BoxShadow(color: widget.color ?? AppColors.accent, blurRadius: 8)],
               ),
             ),
           ),
@@ -366,7 +378,7 @@ class _HoverContainerState extends State<_HoverContainer> {
   }
 }
 
-// ── Download header button ────────────────────────────────────────────────────
+// Download header button
 // Dropdown uses OverlayEntry + CompositedTransformFollower so it is always
 // rendered above ALL widgets on screen regardless of parent clip bounds.
 // The Align(topRight) wrapper inside the follower is critical — without it,
@@ -462,16 +474,16 @@ class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
 
         final isActive = current != null;
         final pct =
-            isActive ? (current!.progress * 100).clamp(0, 100).toInt() : 0;
+            isActive ? (current.progress * 100).clamp(0, 100).toInt() : 0;
         final queuedCount = downloads
             .where((d) =>
                 d.status == DownloadStatus.downloading ||
                 d.status == DownloadStatus.queued)
             .length;
         final bool currentIsAudio =
-            isActive && current!.resolution.endsWith('k');
+            isActive && current.resolution.endsWith('k');
         final Color mainAccent =
-            currentIsAudio ? const Color(0xFF3B82F6) : AppColors.green;
+            currentIsAudio ? const Color(0xFF3B82F6) : AppColors.accent;
 
         return CompositedTransformTarget(
           link: _layerLink,
@@ -485,11 +497,11 @@ class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
               width: isActive ? 230 : 38,
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: AppColors.surface2,
+                color: Colors.transparent,
                 border: Border.all(
                   color: isActive
                       ? mainAccent.withOpacity(0.40)
-                      : AppColors.border,
+                      : AppColors.accent.withOpacity(0.30),
                 ),
                 borderRadius: BorderRadius.circular(9),
               ),
@@ -561,7 +573,7 @@ class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
                                         children: [
                                           Expanded(
                                             child: Text(
-                                              current!.title,
+                                              current.title,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: AppTextStyles.outfit(
@@ -586,7 +598,7 @@ class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
                                       TweenAnimationBuilder<double>(
                                         tween: Tween(
                                             begin: 0,
-                                            end: current!.progress),
+                                            end: current.progress),
                                         duration: const Duration(
                                             milliseconds: 400),
                                         curve: Curves.easeOut,
@@ -623,7 +635,7 @@ class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
   }
 }
 
-// ── Overlay wrapper ───────────────────────────────────────────────────────────
+// Overlay wrapper
 // Align(topRight) lets the child measure its own intrinsic size. Without it,
 // CompositedTransformFollower passes tight full-screen constraints down and the
 // panel renders as a full-screen-sized box.
@@ -659,104 +671,291 @@ class _DownloadDropdownOverlay extends StatelessWidget {
   }
 }
 
-// ── Demo dropdown panel ───────────────────────────────────────────────────────
-
+// Live dropdown panel — shows active downloads + today's history
 class _DownloadDropdownContent extends StatelessWidget {
   const _DownloadDropdownContent();
 
-  static const _demos = [
-    (title: 'Blinding Lights – The Weeknd', progress: 0.72, audio: false),
-    (title: 'Big Dawgs – Hanumankind [4K]', progress: 0.45, audio: false),
-    (title: 'Puthu Mazha – Audio', progress: 0.88, audio: true),
-  ];
+  static String _relTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        width: 224,
-        constraints: const BoxConstraints(maxHeight: 152),
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          border: Border.all(color: AppColors.green.withOpacity(0.22)),
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.42),
-              blurRadius: 20,
-              offset: const Offset(0, 6),
+    return ListenableBuilder(
+      listenable: AppState.instance,
+      builder: (context, _) {
+        final all = AppState.instance.downloads;
+        final active = all
+            .where((d) =>
+                d.status == DownloadStatus.downloading ||
+                d.status == DownloadStatus.queued)
+            .toList();
+        final cutoff = DateTime.now().subtract(const Duration(hours: 24));
+        final recent = all
+            .where((d) =>
+                (d.status == DownloadStatus.done ||
+                    d.status == DownloadStatus.error) &&
+                d.createdAt.isAfter(cutoff))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            width: 280,
+            constraints: const BoxConstraints(maxHeight: 560),
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              border: Border.all(color: AppColors.accent.withOpacity(0.22)),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.42),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: SingleChildScrollView(
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: _demos.map((item) {
-                final accent =
-                    item.audio ? const Color(0xFF3B82F6) : AppColors.green;
-                final pct = (item.progress * 100).toInt();
-                return Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            item.audio
-                                ? Icons.audiotrack_rounded
-                                : Icons.download_rounded,
-                            size: 11,
-                            color: accent,
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              item.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.text,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '$pct%',
-                            style: AppTextStyles.outfit(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: item.progress,
-                          backgroundColor:
-                              AppColors.surface2.withOpacity(0.5),
-                          valueColor: AlwaysStoppedAnimation(accent),
-                          minHeight: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // -- ACTIVE section
+                    _DropSectionHeader(
+                        label: 'DOWNLOADING', count: active.length),
+                    if (active.isEmpty)
+                      const _DropEmptyRow(message: 'No active downloads')
+                    else
+                      ...active.map((d) => _DropActiveRow(item: d)),
+                    // divider
+                    Container(height: 1, color: AppColors.border),
+                    // -- TODAY section
+                    _DropSectionHeader(label: 'TODAY', count: recent.length),
+                    if (recent.isEmpty)
+                      const _DropEmptyRow(message: 'No downloads today')
+                    else
+                      ...recent.map((d) => _DropHistoryRow(
+                            item: d,
+                            relTime: _relTime(d.createdAt),
+                          )),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+        );
+      },
+    );
+  }
+}
+
+// Section header with label + count badge
+class _DropSectionHeader extends StatelessWidget {
+  final String label;
+  final int count;
+  const _DropSectionHeader({required this.label, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 10, 4),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.outfit(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.muted,
+              letterSpacing: 1.1,
+            ),
+          ),
+          const SizedBox(width: 6),
+          if (count > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: AppColors.accentDim,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$count',
+                style: AppTextStyles.outfit(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.accent,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// Empty state row
+class _DropEmptyRow extends StatelessWidget {
+  final String message;
+  const _DropEmptyRow({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Text(
+        message,
+        style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted2),
+      ),
+    );
+  }
+}
+
+// Active download row with progress bar
+class _DropActiveRow extends StatelessWidget {
+  final DownloadItem item;
+  const _DropActiveRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAudio = item.resolution.endsWith('k');
+    final accent = isAudio ? const Color(0xFF3B82F6) : AppColors.accent;
+    final isQueued = item.status == DownloadStatus.queued;
+    final pct = (item.progress * 100).clamp(0, 100).toInt();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isQueued
+                    ? Icons.schedule_rounded
+                    : (isAudio
+                        ? Icons.audiotrack_rounded
+                        : Icons.download_rounded),
+                size: 11,
+                color: accent,
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.text,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              if (isQueued)
+                Text(
+                  'Queued',
+                  style: AppTextStyles.outfit(
+                      fontSize: 10, color: AppColors.muted),
+                )
+              else
+                Text(
+                  '$pct%',
+                  style: AppTextStyles.outfit(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: accent,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (!isQueued)
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: item.progress),
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOut,
+              builder: (_, v, __) => ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: v,
+                  backgroundColor: AppColors.surface2.withOpacity(0.5),
+                  valueColor: AlwaysStoppedAnimation(accent),
+                  minHeight: 2,
+                ),
+              ),
+            )
+          else
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: null,
+                backgroundColor: AppColors.surface2.withOpacity(0.5),
+                valueColor:
+                    AlwaysStoppedAnimation(AppColors.muted.withOpacity(0.4)),
+                minHeight: 2,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// Completed / error row for the TODAY section
+class _DropHistoryRow extends StatelessWidget {
+  final DownloadItem item;
+  final String relTime;
+  const _DropHistoryRow({required this.item, required this.relTime});
+
+  @override
+  Widget build(BuildContext context) {
+    final isAudio = item.resolution.endsWith('k');
+    final isDone = item.status == DownloadStatus.done;
+    final accent = isDone
+        ? (isAudio ? const Color(0xFF3B82F6) : AppColors.accent)
+        : const Color(0xFFEF4444);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: Row(
+        children: [
+          Icon(
+            isDone
+                ? (isAudio
+                    ? Icons.music_note_rounded
+                    : Icons.check_circle_outline_rounded)
+                : Icons.error_outline_rounded,
+            size: 12,
+            color: accent,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: isDone ? AppColors.text : AppColors.muted,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            relTime,
+            style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted2),
+          ),
+        ],
       ),
     );
   }

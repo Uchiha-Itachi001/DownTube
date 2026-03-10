@@ -5,7 +5,10 @@ import 'app_colors.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get dark {
+  static ThemeData get dark => forAccent(AppColors.accent);
+
+  static ThemeData forAccent(Color accent) {
+    final accentDark = Color.lerp(accent, Colors.black, 0.3) ?? accent;
     return ThemeData(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.bg,
@@ -18,9 +21,9 @@ class AppTheme {
         bodyColor: AppColors.text,
         displayColor: AppColors.text,
       ),
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.green,
-        secondary: AppColors.green2,
+      colorScheme: ColorScheme.dark(
+        primary: accent,
+        secondary: accentDark,
         surface: AppColors.surface1,
         error: AppColors.red,
         onPrimary: Colors.black,
@@ -30,12 +33,12 @@ class AppTheme {
         thumbColor: WidgetStateProperty.resolveWith<Color>((states) {
           if (states.contains(WidgetState.hovered) ||
               states.contains(WidgetState.dragged)) {
-            return AppColors.green.withOpacity(0.55);
+            return accent.withValues(alpha: 0.55);
           }
-          return AppColors.green.withOpacity(0.18);
+          return accent.withValues(alpha: 0.18);
         }),
         trackColor: WidgetStatePropertyAll(
-          Colors.white.withOpacity(0.03),
+          Colors.white.withValues(alpha: 0.03),
         ),
         trackBorderColor: const WidgetStatePropertyAll(Colors.transparent),
         thickness: const WidgetStatePropertyAll(4.0),

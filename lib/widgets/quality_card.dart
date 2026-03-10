@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 
@@ -41,20 +41,20 @@ class _QualityCardState extends State<QualityCard> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: widget.isSelected
-                ? AppColors.green.withOpacity(0.08)
+                ? AppColors.accent.withOpacity(0.08)
                 : AppColors.surface2,
             border: Border.all(
               color: widget.isSelected
-                  ? AppColors.green
+                  ? AppColors.accent
                   : (_hovered
-                      ? AppColors.green.withOpacity(0.3)
+                      ? AppColors.accent.withOpacity(0.3)
                       : AppColors.border),
             ),
             borderRadius: BorderRadius.circular(11),
             boxShadow: widget.isSelected
                 ? [
                     BoxShadow(
-                      color: AppColors.green.withOpacity(0.1),
+                      color: AppColors.accent.withOpacity(0.1),
                       blurRadius: 16,
                     ),
                   ]
@@ -86,7 +86,7 @@ class _QualityCardState extends State<QualityCard> {
                     style: AppTextStyles.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.green,
+                      color: AppColors.accent,
                     ),
                   ),
                 ],

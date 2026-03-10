@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:window_manager/window_manager.dart';
+import 'core/app_colors.dart';
 import 'core/app_theme.dart';
+import 'providers/app_state.dart';
 import 'startup/splash_screen.dart';
 
 void main() async {
@@ -15,7 +17,7 @@ void main() async {
   }
   await windowManager.ensureInitialized();
 
-  const minSize = Size(860, 560);
+  const minSize = Size(700, 600);
 
   await windowManager.waitUntilReadyToShow(
     WindowOptions(
@@ -39,11 +41,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'DownTube',
-      theme: AppTheme.dark,
-      home: const SplashScreen(),
+    return ListenableBuilder(
+      listenable: AppState.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'DownTube',
+          theme: AppTheme.forAccent(AppColors.accent),
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../core/app_colors.dart';
@@ -21,51 +22,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
     (icon: Icons.movie_rounded, label: 'Video'),
     (icon: Icons.music_note_rounded, label: 'Audio'),
     (icon: Icons.storage_rounded, label: 'Storage'),
-    (icon: Icons.language_rounded, label: 'Network'),
     (icon: Icons.notifications_rounded, label: 'Notifications'),
     (icon: Icons.palette_rounded, label: 'Appearance'),
     (icon: Icons.person_rounded, label: 'Account'),
+    (icon: Icons.info_outline_rounded, label: 'Info'),
     (icon: Icons.warning_amber_rounded, label: 'Reset'),
   ];
 
-  // Settings state
-  bool _autoDownload = true;
-  bool _embedSubs = true;
-  bool _saveThumbnail = true;
-  bool _addChapters = false;
-  bool _autoUpdate = true;
-  bool _darkMode = true;
-  bool _notifications = true;
-  bool _soundEffects = false;
-  int _maxConcurrent = 3;
-  bool _limitBandwidth = false;
+  // Profile editing controllers
+  late TextEditingController _firstNameCtrl;
+  late TextEditingController _lastNameCtrl;
 
-  String _defaultQuality = '1080p';
-  String _defaultFormat = 'MP4';
-  String _defaultAudioFormat = 'MP3';
-  String _audioBitrate = '320 kbps';
+  @override
+  void initState() {
+    super.initState();
+    _firstNameCtrl = TextEditingController(
+      text: AppState.instance.userFirstName ?? '',
+    );
+    _lastNameCtrl = TextEditingController(
+      text: AppState.instance.userLastName ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Settings nav
-        _buildNav(),
-        const SizedBox(width: AppColors.gap),
-        // Settings content
-        Expanded(child: _buildContent()),
-      ],
+    return ListenableBuilder(
+      listenable: AppState.instance,
+      builder: (context, _) {
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildNav(),
+            const SizedBox(width: AppColors.gap),
+            Expanded(child: _buildContent()),
+          ],
+        );
+      },
     );
   }
+
+  // --- NAV -----------------------------------------------------------------
 
   Widget _buildNav() {
     return Container(
       width: 210,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: Column(
@@ -105,25 +116,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: isActive ? AppColors.greenDim : Colors.transparent,
+                      color:
+                          isActive ? AppColors.accentDim : Colors.transparent,
                       borderRadius: BorderRadius.circular(9),
-                      border:
-                          isActive
-                              ? Border.all(
-                                color: AppColors.green.withOpacity(0.15),
-                              )
-                              : null,
+                      border: isActive
+                          ? Border.all(
+                              color:
+                                  AppColors.accent.withValues(alpha: 0.15),
+                            )
+                          : null,
                     ),
                     child: Row(
                       children: [
                         Icon(
                           _navItems[i].icon,
                           size: 16,
-                          color:
-                              isReset && !isActive
-                                  ? AppColors.red.withOpacity(0.7)
-                                  : isActive
-                                  ? AppColors.green
+                          color: isReset && !isActive
+                              ? AppColors.red.withOpacity(0.7)
+                              : isActive
+                                  ? AppColors.accent
                                   : AppColors.muted,
                         ),
                         const SizedBox(width: 10),
@@ -133,11 +144,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             fontSize: 13,
                             fontWeight:
                                 isActive ? FontWeight.w600 : FontWeight.w400,
-                            color:
-                                isReset && !isActive
-                                    ? AppColors.red.withOpacity(0.7)
-                                    : isActive
-                                    ? AppColors.green
+                            color: isReset && !isActive
+                                ? AppColors.red.withOpacity(0.7)
+                                : isActive
+                                    ? AppColors.accent
                                     : AppColors.muted,
                           ),
                         ),
@@ -146,8 +156,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Container(
                             width: 4,
                             height: 4,
-                            decoration: const BoxDecoration(
-                              color: AppColors.green,
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -159,7 +169,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             );
           }),
           const Spacer(),
-          // Storage usage at bottom of nav
           _buildStorageUsage(),
         ],
       ),
@@ -169,24 +178,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildStorageUsage() {
     final totalBytes = AppState.instance.totalStorageBytes;
     final label = AppState.formatBytes(totalBytes);
-    final count =
-        AppState.instance.downloads
-            .where((d) => d.status == DownloadStatus.done)
-            .length;
+    final count = AppState.instance.downloads
+        .where((d) => d.status == DownloadStatus.done)
+        .length;
     return Container(
       margin: const EdgeInsets.all(6),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
+        color: AppColors.surfaceTransparent2,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.accent.withOpacity(0.20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.pie_chart_rounded, size: 13, color: AppColors.green),
+              Icon(Icons.pie_chart_rounded, size: 13, color: AppColors.accent),
               const SizedBox(width: 6),
               Text(
                 'Storage Used',
@@ -217,22 +225,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // --- CONTENT -------------------------------------------------------------
+
   Widget _buildContent() {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Active section header
             _buildContentHeader(),
             const SizedBox(height: 20),
-            // Content based on selected nav
             _buildSectionContent(),
           ],
         ),
@@ -248,12 +256,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: AppColors.greenDim,
+            color: AppColors.accentDim,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.green.withOpacity(0.15)),
+            border:
+                Border.all(color: AppColors.accent.withValues(alpha: 0.15)),
           ),
           child: Center(
-            child: Icon(item.icon, size: 18, color: AppColors.green),
+            child: Icon(item.icon, size: 18, color: AppColors.accent),
           ),
         ),
         const SizedBox(width: 12),
@@ -269,7 +278,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             Text(
               _sectionDescription(),
-              style: AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
+              style:
+                  AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
             ),
           ],
         ),
@@ -283,10 +293,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       1 => 'Video quality and format preferences',
       2 => 'Audio extraction and format options',
       3 => 'Storage paths and file management',
-      4 => 'Proxy and bandwidth settings',
-      5 => 'Notification preferences',
-      6 => 'Theme and display options',
-      7 => 'Account and profile settings',
+      4 => 'Notification preferences',
+      5 => 'Theme and display options',
+      6 => 'Your profile and display name',
+      7 => 'App version, engine info and updates',
       8 => 'Reset app to defaults',
       _ => '',
     };
@@ -298,16 +308,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       1 => _videoSection(),
       2 => _audioSection(),
       3 => _storageSection(),
-      4 => _networkSection(),
-      5 => _notificationsSection(),
-      6 => _appearanceSection(),
-      7 => _accountSection(),
+      4 => _notificationsSection(),
+      5 => _appearanceSection(),
+      6 => _accountSection(),
+      7 => _infoSection(),
       8 => _resetSection(),
       _ => const SizedBox.shrink(),
     };
   }
 
+  // --- DOWNLOADS -----------------------------------------------------------
+
   Widget _downloadsSection() {
+    final state = AppState.instance;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -316,26 +329,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Automatically start download when URL is pasted',
           icon: Icons.content_paste_rounded,
           trailing: ToggleSwitch(
-            value: _autoDownload,
-            onChanged: (v) => setState(() => _autoDownload = v),
+            value: state.autoDownload,
+            onChanged: (v) => state.setAutoDownload(v),
           ),
         ),
         _settingRow(
           'Max Concurrent Downloads',
-          'Number of files downloading simultaneously',
+          state.autoDownload
+              ? 'Auto-managed based on queue size (1-500)'
+              : 'Number of files downloading simultaneously (1-500)',
           icon: Icons.downloading_rounded,
-          trailing: _stepper(
-            _maxConcurrent,
-            (v) => setState(() => _maxConcurrent = v),
-          ),
+          trailing: state.autoDownload
+              ? Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentDim,
+                    border: Border.all(
+                        color: AppColors.accent.withOpacity(0.25)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Auto',
+                    style: AppTextStyles.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
         _settingRow(
           'Embed Subtitles',
           'Automatically embed available subtitles',
           icon: Icons.subtitles_rounded,
           trailing: ToggleSwitch(
-            value: _embedSubs,
-            onChanged: (v) => setState(() => _embedSubs = v),
+            value: state.embedSubs,
+            onChanged: (v) => state.setEmbedSubs(v),
           ),
         ),
         _settingRow(
@@ -343,8 +374,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Download and embed video thumbnail',
           icon: Icons.image_rounded,
           trailing: ToggleSwitch(
-            value: _saveThumbnail,
-            onChanged: (v) => setState(() => _saveThumbnail = v),
+            value: state.saveThumbnail,
+            onChanged: (v) => state.setSaveThumbnail(v),
           ),
         ),
         _settingRow(
@@ -352,74 +383,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Include chapter markers in download',
           icon: Icons.bookmark_border_rounded,
           trailing: ToggleSwitch(
-            value: _addChapters,
-            onChanged: (v) => setState(() => _addChapters = v),
+            value: state.addChapters,
+            onChanged: (v) => state.setAddChapters(v),
           ),
         ),
       ],
     );
   }
 
+  // --- VIDEO ---------------------------------------------------------------
+
   Widget _videoSection() {
+    final state = AppState.instance;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _settingRow(
           'Default Quality',
-          'Preferred video quality for downloads',
+          'Applied automatically when analyzing a video',
           icon: Icons.high_quality_rounded,
-          trailing: _dropdown(_defaultQuality, [
+          trailing: _dropdown(state.defaultQuality, [
+            'Best',
             '4K',
             '1080p',
             '720p',
             '480p',
             '360p',
-          ], (v) => setState(() => _defaultQuality = v)),
+          ], (v) => state.setDefaultQuality(v)),
         ),
         _settingRow(
           'Default Format',
-          'Preferred output container format',
+          'Applied automatically to every download',
           icon: Icons.video_file_rounded,
-          trailing: _dropdown(_defaultFormat, [
+          trailing: _dropdown(state.defaultFormat, [
             'MP4',
             'MKV',
             'WEBM',
-          ], (v) => setState(() => _defaultFormat = v)),
+          ], (v) => state.setDefaultFormat(v)),
         ),
       ],
     );
   }
 
+  // --- AUDIO ---------------------------------------------------------------
+
   Widget _audioSection() {
+    final state = AppState.instance;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _settingRow(
           'Audio Format',
-          'Preferred audio extraction format',
+          'Applied automatically for audio downloads',
           icon: Icons.audio_file_rounded,
-          trailing: _dropdown(_defaultAudioFormat, [
+          trailing: _dropdown(state.defaultAudioFormat, [
             'MP3',
             'FLAC',
             'WAV',
             'AAC',
             'OGG',
-          ], (v) => setState(() => _defaultAudioFormat = v)),
+          ], (v) => state.setDefaultAudioFormat(v)),
         ),
         _settingRow(
           'Bitrate',
           'Audio quality bitrate',
           icon: Icons.graphic_eq_rounded,
-          trailing: _dropdown(_audioBitrate, [
+          trailing: _dropdown(state.audioBitrate, [
             '128 kbps',
             '192 kbps',
             '256 kbps',
             '320 kbps',
-          ], (v) => setState(() => _audioBitrate = v)),
+          ], (v) => state.setAudioBitrate(v)),
         ),
       ],
     );
   }
+
+  // --- STORAGE -------------------------------------------------------------
 
   Widget _storageSection() {
     return Column(
@@ -441,13 +481,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final videoBytes = AppState.instance.videoStorageBytes;
     final audioBytes = AppState.instance.audioStorageBytes;
     final totalBytes = AppState.instance.totalStorageBytes;
-    // "Other" is anything not categorized (currently none, but left for future)
     final otherBytes = totalBytes - videoBytes - audioBytes;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surfaceTransparent2,
+        border: Border.all(color: AppColors.accent.withOpacity(0.20)),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
@@ -470,20 +509,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: AppTextStyles.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.green,
+                  color: AppColors.accent,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          _storageItem('Videos', videoBytes, totalBytes, AppColors.green),
+          _storageItem('Videos', videoBytes, totalBytes, AppColors.accent),
           const SizedBox(height: 8),
           _storageItem(
-            'Audio',
-            audioBytes,
-            totalBytes,
-            const Color(0xFF3B82F6),
-          ),
+              'Audio', audioBytes, totalBytes, const Color(0xFF3B82F6)),
           if (otherBytes > 0) ...[
             const SizedBox(height: 8),
             _storageItem('Other', otherBytes, totalBytes, AppColors.muted),
@@ -544,43 +579,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _networkSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _settingRow(
-          'Limit Bandwidth',
-          'Restrict download speed to avoid network saturation',
-          icon: Icons.speed_rounded,
-          trailing: ToggleSwitch(
-            value: _limitBandwidth,
-            onChanged: (v) => setState(() => _limitBandwidth = v),
-          ),
-        ),
-        _settingRow(
-          'Auto-update YT-DLP',
-          'Keep yt-dlp engine updated automatically',
-          icon: Icons.system_update_rounded,
-          trailing: ToggleSwitch(
-            value: _autoUpdate,
-            onChanged: (v) => setState(() => _autoUpdate = v),
-          ),
-        ),
-      ],
-    );
-  }
+  // --- NOTIFICATIONS -------------------------------------------------------
 
   Widget _notificationsSection() {
+    final state = AppState.instance;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _settingRow(
           'Desktop Notifications',
-          'Show system notifications for downloads',
+          'Show system notifications when downloads complete',
           icon: Icons.notifications_active_rounded,
           trailing: ToggleSwitch(
-            value: _notifications,
-            onChanged: (v) => setState(() => _notifications = v),
+            value: state.notificationsEnabled,
+            onChanged: (v) => state.setNotificationsEnabled(v),
           ),
         ),
         _settingRow(
@@ -588,74 +600,389 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Play sound when download completes',
           icon: Icons.volume_up_rounded,
           trailing: ToggleSwitch(
-            value: _soundEffects,
-            onChanged: (v) => setState(() => _soundEffects = v),
+            value: state.soundEffects,
+            onChanged: (v) => state.setSoundEffects(v),
           ),
         ),
       ],
     );
   }
+
+  // --- APPEARANCE ----------------------------------------------------------
 
   Widget _appearanceSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _settingRow(
-          'Dark Mode',
-          'Use dark theme across the application',
-          icon: Icons.dark_mode_rounded,
-          trailing: ToggleSwitch(
-            value: _darkMode,
-            onChanged: (v) => setState(() => _darkMode = v),
+          'Accent Color',
+          'Choose the app accent color. Changes take effect immediately.',
+          icon: Icons.palette_rounded,
+          trailing: const SizedBox.shrink(),
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: AppColors.themeOptions.map((opt) {
+            final isSelected = AppState.instance.themeColor.toARGB32() ==
+                opt.color.toARGB32();
+            return GestureDetector(
+              onTap: () => AppState.instance.setThemeColor(opt.color),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Tooltip(
+                  message: opt.name,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: opt.color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color:
+                            isSelected ? Colors.white : Colors.transparent,
+                        width: 2.5,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: opt.color.withValues(alpha: 0.5),
+                                blurRadius: 12,
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check_rounded,
+                            color: Colors.black, size: 20)
+                        : null,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  // --- ACCOUNT / PROFILE ---------------------------------------------------
+
+  Widget _accountSection() {
+    final state = AppState.instance;
+    final hasPic =
+        state.userProfilePic != null && File(state.userProfilePic!).existsSync();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Profile card
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceTransparent2,
+            border: Border.all(color: AppColors.accent.withOpacity(0.20)),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              // Avatar
+              GestureDetector(
+                onTap: _pickProfilePicture,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: AppColors.accentDim,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.accent.withOpacity(0.40),
+                            width: 2,
+                          ),
+                          image: hasPic
+                              ? DecorationImage(
+                                  image:
+                                      FileImage(File(state.userProfilePic!)),
+                                  fit: BoxFit.cover,
+                                )
+                              : null,
+                        ),
+                        child: hasPic
+                            ? null
+                            : Center(
+                                child: Text(
+                                  state.userInitial,
+                                  style: AppTextStyles.syne(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.accent,
+                                  ),
+                                ),
+                              ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color: AppColors.bg, width: 2),
+                          ),
+                          child: const Icon(Icons.camera_alt_rounded,
+                              size: 12, color: Colors.black),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              // Name + info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      state.userDisplayName,
+                      style: AppTextStyles.syne(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'All data is stored locally - nothing leaves your device.',
+                      style: AppTextStyles.outfit(
+                        fontSize: 11,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Edit fields
+        _settingRow(
+          'First Name',
+          'Your display first name',
+          icon: Icons.badge_rounded,
+          trailing: _textInput(
+            _firstNameCtrl,
+            onChanged: (v) {
+              AppState.instance.setUserProfile(
+                firstName: v,
+                lastName: _lastNameCtrl.text,
+              );
+            },
+          ),
+        ),
+        _settingRow(
+          'Last Name',
+          'Your display last name',
+          icon: Icons.badge_rounded,
+          trailing: _textInput(
+            _lastNameCtrl,
+            onChanged: (v) {
+              AppState.instance.setUserProfile(
+                firstName: _firstNameCtrl.text,
+                lastName: v,
+              );
+            },
           ),
         ),
       ],
     );
   }
 
-  Widget _accountSection() {
+  Future<void> _pickProfilePicture() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+    );
+    if (result != null && result.files.single.path != null) {
+      await AppState.instance.setUserProfilePicture(result.files.single.path!);
+    }
+  }
+
+  // --- INFO ----------------------------------------------------------------
+
+  Widget _infoSection() {
+    final state = AppState.instance;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // App info card
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceTransparent,
+            border: Border.all(color: AppColors.accent.withOpacity(0.30)),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: AppColors.accentDim,
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(
+                          color: AppColors.accent.withOpacity(0.25)),
+                    ),
+                    child: Icon(Icons.download_rounded,
+                        size: 22, color: AppColors.accent),
+                  ),
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'DownTube',
+                        style: AppTextStyles.syne(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'v2.4.0 - Open Source Video Downloader',
+                        style: AppTextStyles.outfit(
+                          fontSize: 11,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceTransparent2,
+                  border: Border.all(color: AppColors.accent.withOpacity(0.18)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RELEASE NOTES',
+                      style: AppTextStyles.outfit(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _releaseItem('Transparent UI with glass effect'),
+                        _releaseItem('User profile and first-time setup'),
+                        _releaseItem('Persistent video & audio defaults'),
+                        _releaseItem('Info tab with engine updates'),
+                        _releaseItem('Improved settings layout'),
+                        _releaseItem('Playlist batch downloads'),
+                        _releaseItem('SQLite download history'),
+                        _releaseItem('Session stats & live speed'),
+                        _releaseItem('Smart yt-dlp error handling'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // yt-dlp engine info
+        _settingRow(
+          'yt-dlp Engine',
+          state.ytDlpReady
+              ? 'Version: ${state.ytDlpVersion ?? "Unknown"}'
+              : 'Engine not found',
+          icon: Icons.engineering_rounded,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: state.ytDlpReady ? AppColors.accent : AppColors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                state.ytDlpReady ? 'Ready' : 'Offline',
+                style: AppTextStyles.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: state.ytDlpReady ? AppColors.accent : AppColors.red,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _settingRow(
+          'Auto-update yt-dlp',
+          'Keep yt-dlp engine updated automatically',
+          icon: Icons.system_update_rounded,
+          trailing: ToggleSwitch(
+            value: state.autoUpdateYtDlp,
+            onChanged: (v) => state.setAutoUpdateYtDlp(v),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _releaseItem(String text) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(10),
+        color: AppColors.accentDim,
+        border: Border.all(color: AppColors.accent.withOpacity(0.15)),
+        borderRadius: BorderRadius.circular(6),
       ),
-      child: Column(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.person_rounded, size: 42, color: AppColors.muted),
-          const SizedBox(height: 12),
+          Icon(Icons.check_circle_outline_rounded,
+              size: 12, color: AppColors.accent),
+          const SizedBox(width: 6),
           Text(
-            'No account linked',
+            text,
             style: AppTextStyles.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
+              fontSize: 11,
+              color: AppColors.text.withOpacity(0.85),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Sign in to sync settings across devices',
-            style: AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
-          ),
-          const SizedBox(height: 20),
-          // Version info
-          Text(
-            'DownTube v2.4.0',
-            style: AppTextStyles.outfit(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.muted,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Powered by yt-dlp 2024.12.06',
-            style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted2),
           ),
         ],
       ),
     );
   }
+
+  // --- RESET ---------------------------------------------------------------
 
   Widget _resetSection() {
     return Container(
@@ -670,7 +997,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.warning_amber_rounded, size: 20, color: AppColors.red),
+              Icon(Icons.warning_amber_rounded,
+                  size: 20, color: AppColors.red),
               const SizedBox(width: 8),
               Text(
                 'Danger Zone',
@@ -697,14 +1025,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 message:
                     'This will reset all preferences to default values. This action cannot be undone.',
                 onConfirm: () {
-                  // Reset settings to defaults
                   Navigator.of(context).pop();
                 },
               );
             },
           ),
           const SizedBox(height: 8),
-          _dangerButton('Clear Download History', Icons.delete_sweep_rounded, () {
+          _dangerButton(
+              'Clear Download History', Icons.delete_sweep_rounded, () {
             _showConfirmDialog(
               title: 'Clear Download History',
               message:
@@ -722,14 +1050,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               message:
                   'This will remove download records for files that no longer exist on disk. Active downloads will not be affected.',
               onConfirm: () async {
-                final removed = await AppState.instance.cleanMissingFiles();
+                final removed =
+                    await AppState.instance.cleanMissingFiles();
                 if (mounted) {
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
                         removed > 0
-                            ? 'Removed $removed stale record${removed > 1 ? 's' : ''}'
+                            ? 'Removed $removed stale record${removed > 1 ? "s" : ""}'
                             : 'No stale records found',
                         style: const TextStyle(fontFamily: 'Outfit'),
                       ),
@@ -747,21 +1076,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // --- SHARED WIDGETS ------------------------------------------------------
+
   Widget _dangerButton(String label, IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.surface2,
+            color: AppColors.surfaceTransparent2,
             border: Border.all(color: AppColors.red.withOpacity(0.2)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             children: [
-              Icon(icon, size: 16, color: AppColors.red.withOpacity(0.7)),
+              Icon(icon,
+                  size: 16, color: AppColors.red.withOpacity(0.7)),
               const SizedBox(width: 10),
               Text(
                 label,
@@ -785,107 +1118,103 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     showDialog(
       context: context,
-      builder:
-          (ctx) => Dialog(
-            backgroundColor: AppColors.surface1,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide(color: AppColors.red.withOpacity(0.25)),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 380),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (ctx) => Dialog(
+        backgroundColor: AppColors.surface1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: AppColors.red.withOpacity(0.25)),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 22,
-                          color: AppColors.red,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          title,
-                          style: AppTextStyles.syne(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
+                    Icon(Icons.warning_amber_rounded,
+                        size: 22, color: AppColors.red),
+                    const SizedBox(width: 10),
                     Text(
-                      message,
-                      style: AppTextStyles.outfit(
-                        fontSize: 13,
-                        color: AppColors.muted,
+                      title,
+                      style: AppTextStyles.syne(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.red,
                       ),
-                    ),
-                    const SizedBox(height: 22),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        GestureDetector(
-                          onTap: () => Navigator.of(ctx).pop(),
-                          child: MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 9,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: AppColors.border),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Cancel',
-                                style: AppTextStyles.outfit(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.muted,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        GestureDetector(
-                          onTap: onConfirm,
-                          child: MouseRegion(
-                            cursor: SystemMouseCursors.click,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 9,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.red,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'Confirm',
-                                style: AppTextStyles.outfit(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 14),
+                Text(
+                  message,
+                  style: AppTextStyles.outfit(
+                    fontSize: 13,
+                    color: AppColors.muted,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    GestureDetector(
+                      onTap: () => Navigator.of(ctx).pop(),
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.border),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: AppTextStyles.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: onConfirm,
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.red,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Confirm',
+                            style: AppTextStyles.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
+        ),
+      ),
     );
   }
 
@@ -898,10 +1227,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
         decoration: BoxDecoration(
-          color: AppColors.surface2,
-          border: Border.all(color: AppColors.border),
+          color: AppColors.surfaceTransparent2,
+          border: Border.all(color: AppColors.accent.withOpacity(0.15)),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
@@ -944,17 +1274,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     List<String> items,
     ValueChanged<String> onChanged,
   ) {
+    final safeValue = items.contains(value) ? value : items.first;
+    if (safeValue != value) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => onChanged(safeValue));
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       height: 32,
       decoration: BoxDecoration(
-        color: AppColors.surface3,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surfaceTransparent2,
+        border: Border.all(color: AppColors.accent.withOpacity(0.20)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: value,
+          value: safeValue,
           dropdownColor: AppColors.surface2,
           style: AppTextStyles.outfit(
             fontSize: 12,
@@ -965,10 +1299,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             size: 18,
             color: AppColors.muted,
           ),
-          items:
-              items
-                  .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                  .toList(),
+          items: items
+              .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+              .toList(),
           onChanged: (v) {
             if (v != null) onChanged(v);
           },
@@ -977,47 +1310,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _stepper(int value, ValueChanged<int> onChanged) {
-    return Container(
+  Widget _textInput(
+    TextEditingController ctrl, {
+    ValueChanged<String>? onChanged,
+  }) {
+    return SizedBox(
+      width: 180,
       height: 32,
-      decoration: BoxDecoration(
-        color: AppColors.surface3,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _stepperBtn(Icons.remove_rounded, () {
-            if (value > 1) onChanged(value - 1);
-          }),
-          Container(
-            width: 36,
-            alignment: Alignment.center,
-            child: Text(
-              '$value',
-              style: AppTextStyles.outfit(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+      child: TextField(
+        controller: ctrl,
+        onChanged: onChanged,
+        style: AppTextStyles.outfit(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          filled: true,
+          fillColor: AppColors.surfaceTransparent2,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide:
+                BorderSide(color: AppColors.accent.withOpacity(0.20)),
           ),
-          _stepperBtn(Icons.add_rounded, () {
-            if (value < 10) onChanged(value + 1);
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _stepperBtn(IconData icon, VoidCallback onTap) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Icon(icon, size: 16, color: AppColors.muted),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide:
+                BorderSide(color: AppColors.accent.withOpacity(0.50)),
+          ),
         ),
       ),
     );
@@ -1032,7 +1354,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           final picked = await FilePicker.platform.getDirectoryPath();
           if (picked != null) {
             await AppState.instance.setDownloadPath(picked);
-            setState(() {});
           }
         },
         child: Container(
@@ -1040,8 +1361,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           height: 32,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: AppColors.surface3,
-            border: Border.all(color: AppColors.green, width: .5),
+            color: AppColors.surfaceTransparent2,
+            border: Border.all(color: AppColors.accent, width: .5),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
@@ -1051,15 +1372,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   currentPath,
                   style: AppTextStyles.outfit(
                     fontSize: 12,
-                    color: AppColors.green.withOpacity(0.7),
+                    color: AppColors.accent.withOpacity(0.7),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.folder_open_rounded,
                 size: 16,
-                color: AppColors.green,
+                color: AppColors.accent,
               ),
             ],
           ),

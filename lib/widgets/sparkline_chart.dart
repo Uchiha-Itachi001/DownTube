@@ -117,21 +117,21 @@ class _SparklineChartState extends State<SparklineChart>
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
                   gradient: bright
-                      ? const LinearGradient(
+                      ? LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          colors: [AppColors.green, Color(0x3322C55E)],
+                          colors: [AppColors.accent, Color(0x3322C55E)],
                         )
                       : LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            AppColors.green.withOpacity((0.30 + v * 0.55).clamp(0.20, 0.85)),
-                            AppColors.green.withOpacity(0.08),
+                            AppColors.accent.withOpacity((0.30 + v * 0.55).clamp(0.20, 0.85)),
+                            AppColors.accent.withOpacity(0.08),
                           ],
                         ),
                   boxShadow: bright
-                      ? [BoxShadow(color: AppColors.greenGlow, blurRadius: 8)]
+                      ? [BoxShadow(color: AppColors.accentGlow, blurRadius: 8)]
                       : null,
                 ),
               ),

@@ -16,6 +16,7 @@ class Sidebar extends StatelessWidget {
   final bool collapsed;
   final bool hasAnalysis;
   final VoidCallback? onAnalyzeSelected;
+  final bool drawerMode;
 
   const Sidebar({
     super.key,
@@ -25,6 +26,7 @@ class Sidebar extends StatelessWidget {
     this.collapsed = false,
     this.hasAnalysis = false,
     this.onAnalyzeSelected,
+    this.drawerMode = false,
   });
 
   @override
@@ -35,8 +37,10 @@ class Sidebar extends StatelessWidget {
       width: width,
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.25)),
+        color: drawerMode
+            ? const Color(0xFF111418).withOpacity(0.70)
+            : AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       // OverflowBox lets the child lay out at the full target width even while
@@ -62,7 +66,7 @@ class Sidebar extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      AppColors.green.withOpacity(0.08),
+                      AppColors.accent.withValues(alpha: 0.08),
                       Colors.transparent,
                     ],
                   ),
@@ -109,7 +113,7 @@ class Sidebar extends StatelessWidget {
                                 isActive: selectedIndex == 5,
                                 onTap: () => onAnalyzeSelected?.call(),
                                 collapsed: collapsed,
-                                accent: const Color(0xFF22C55E),
+                                accent: AppColors.accent,
                               ),
                             _NavItem(
                               icon: Icons.video_library_rounded,
@@ -177,8 +181,7 @@ class Sidebar extends StatelessWidget {
   }
 }
 
-// ── Storage box (own widget so it rebuilds on AppState changes) ───────────────
-
+// Storage box (own widget so it rebuilds on AppState changes)
 class _StorageBox extends StatelessWidget {
   const _StorageBox();
 
@@ -195,8 +198,8 @@ class _StorageBox extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(color: AppColors.border),
+            color: AppColors.surfaceTransparent2,
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.20)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
@@ -219,7 +222,7 @@ class _StorageBox extends StatelessWidget {
                     style: AppTextStyles.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.green,
+                      color: AppColors.accent,
                     ),
                   ),
                 ],
@@ -280,13 +283,13 @@ class _NavItemState extends State<_NavItem> {
   @override
   Widget build(BuildContext context) {
     final isActive = widget.isActive;
-    final accent = widget.accent ?? AppColors.green;
+    final accent = widget.accent ?? AppColors.accent;
     final bg = isActive
         ? accent.withOpacity(0.12)
-        : (_hovered ? AppColors.surface2 : Colors.transparent);
+        : (_hovered ? accent.withOpacity(0.09) : Colors.transparent);
     final borderColor = isActive
         ? accent.withOpacity(0.25)
-        : Colors.transparent;
+        : (_hovered ? accent.withOpacity(0.15) : Colors.transparent);
     final iconColor = isActive
         ? accent
         : (_hovered ? AppColors.text : AppColors.muted);
@@ -304,7 +307,7 @@ class _NavItemState extends State<_NavItem> {
           ),
           decoration: BoxDecoration(
             color: AppColors.surface1,
-            border: Border.all(color: AppColors.green.withOpacity(0.35)),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
@@ -339,8 +342,8 @@ class _NavItemState extends State<_NavItem> {
                         child: Container(
                           width: 7,
                           height: 7,
-                          decoration: const BoxDecoration(
-                            color: AppColors.green,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -388,7 +391,7 @@ class _NavItemState extends State<_NavItem> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(
-                      color: AppColors.green,
+                      color: AppColors.accent,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(

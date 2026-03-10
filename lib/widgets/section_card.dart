@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 
@@ -23,8 +23,8 @@ class SectionCard extends StatelessWidget {
     final content = Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.25)),
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: Column(
@@ -39,7 +39,7 @@ class SectionCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.greenDim,
+                    color: AppColors.accentDim,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -47,7 +47,7 @@ class SectionCard extends StatelessWidget {
                     style: AppTextStyles.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.green,
+                      color: AppColors.accent,
                     ),
                   ),
                 ),

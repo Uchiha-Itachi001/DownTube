@@ -1,10 +1,9 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import '../models/download_item.dart';
 import '../providers/app_state.dart';
-import '../widgets/download_item_tile.dart';
 import '../widgets/section_card.dart';
 import '../widgets/sparkline_chart.dart';
 import '../widgets/stat_tile.dart';
@@ -318,8 +317,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               Container(
                 width: 7,
                 height: 7,
-                decoration: const BoxDecoration(
-                  color: AppColors.green,
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -408,14 +407,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   }
 }
 
-// ── Download grid card (LibraryCard-styled) ───────────────────────────────────
-
+// Download grid card (LibraryCard-styled)
 class _DownloadGridCard extends StatefulWidget {
   final DownloadItem item;
   final VoidCallback? onCancel;
-  final VoidCallback? onDelete;
 
-  const _DownloadGridCard({required this.item, this.onCancel, this.onDelete});
+  const _DownloadGridCard({required this.item, this.onCancel});
 
   @override
   State<_DownloadGridCard> createState() => _DownloadGridCardState();
@@ -429,13 +426,13 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
     return f == 'mp3' || f == 'wav' || f == 'flac' || f == 'aac' || f == 'm4a';
   }
 
-  Color get _accent => _isAudio ? const Color(0xFF3B82F6) : AppColors.green;
+  Color get _accent => _isAudio ? const Color(0xFF3B82F6) : AppColors.accent;
 
   bool get _isActive =>
       widget.item.status == DownloadStatus.downloading ||
       widget.item.status == DownloadStatus.queued;
 
-  // ── Phase helpers ──────────────────────────────────────────────────────────
+  // Phase helpers
   (String, IconData, Color) get _phaseInfo {
     final item = widget.item;
     if (item.status == DownloadStatus.queued) {
@@ -445,13 +442,13 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
       return ('Error', Icons.error_outline_rounded, AppColors.red);
     }
     if (item.status == DownloadStatus.done) {
-      return ('Complete', Icons.check_circle_rounded, AppColors.green);
+      return ('Complete', Icons.check_circle_rounded, AppColors.accent);
     }
     return switch (item.phase) {
       DownloadPhase.video => (
         'Downloading Video',
         Icons.movie_rounded,
-        AppColors.green,
+        AppColors.accent,
       ),
       DownloadPhase.audio => (
         'Downloading Audio',
@@ -466,7 +463,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
       DownloadPhase.complete => (
         'Complete',
         Icons.check_circle_rounded,
-        AppColors.green,
+        AppColors.accent,
       ),
     };
   }
@@ -481,32 +478,6 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
       icon: Icons.close_rounded,
     );
     if (ok && mounted) widget.onCancel?.call();
-  }
-
-  Future<void> _confirmDelete() async {
-    final ok = await _showConfirmDialog(
-      context,
-      title: 'Remove Download',
-      body:
-          'Remove "${widget.item.title}" from history?\n\nThe file stays in your Library.',
-      confirmLabel: 'Remove',
-      confirmColor: AppColors.red,
-      icon: Icons.delete_outline_rounded,
-    );
-    if (ok && mounted) widget.onDelete?.call();
-  }
-
-  Future<void> _confirmPermDelete() async {
-    final ok = await _showConfirmDialog(
-      context,
-      title: 'Delete File',
-      body:
-          'Permanently delete "${widget.item.title}" from your device?\n\nThis cannot be undone.',
-      confirmLabel: 'Delete',
-      confirmColor: AppColors.red,
-      icon: Icons.delete_forever_rounded,
-    );
-    if (ok && mounted) AppState.instance.permanentlyDelete(widget.item.id);
   }
 
   @override
@@ -550,7 +521,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── Thumbnail ──────────────────────────────────────────────────
+            // Thumbnail
             SizedBox(
               height: 108,
               child: ClipRRect(
@@ -560,7 +531,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                 child: _buildThumbnail(item, accent),
               ),
             ),
-            // ── Info ───────────────────────────────────────────────────────
+            // Info
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               child: Column(
@@ -609,7 +580,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                       ],
                     ],
                   ),
-                  // ── Progress bar (smooth, inside info section) ────────────
+                  // Progress bar (smooth, inside info section)
                   if (_isActive) ...[
                     const SizedBox(height: 6),
                     TweenAnimationBuilder<double>(
@@ -715,21 +686,6 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
     Process.run('cmd', ['/c', 'start', '', path]);
   }
 
-  List<Widget> _buildCompletedActions() => [
-    _ActionButton(
-      icon: Icons.delete_outline_rounded,
-      label: 'Remove',
-      color: AppColors.muted,
-      onTap: _confirmDelete,
-    ),
-    _ActionButton(
-      icon: Icons.delete_forever_rounded,
-      label: 'Delete',
-      color: AppColors.red,
-      onTap: _confirmPermDelete,
-    ),
-  ];
-
   Widget _buildThumbnail(DownloadItem item, Color accent) {
     return Stack(
       fit: StackFit.expand,
@@ -796,11 +752,11 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
               width: 8,
               height: 8,
               decoration: BoxDecoration(
-                color: AppColors.green,
+                color: AppColors.accent,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.green.withOpacity(0.6),
+                    color: AppColors.accent.withOpacity(0.6),
                     blurRadius: 6,
                   ),
                 ],
@@ -825,8 +781,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
   );
 }
 
-// ── Quality badge ─────────────────────────────────────────────────────────────
-
+// Quality badge
 class _QualityBadge extends StatelessWidget {
   final String resolution;
   final String format;
@@ -835,7 +790,7 @@ class _QualityBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isAudio = resolution.endsWith('k');
-    final color = isAudio ? const Color(0xFF3B82F6) : AppColors.green;
+    final color = isAudio ? const Color(0xFF3B82F6) : AppColors.accent;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -877,8 +832,7 @@ class _QualityBadge extends StatelessWidget {
   }
 }
 
-// ── Action button with hover effect ──────────────────────────────────────────
-
+// Action button with hover effect
 class _ActionButton extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -944,8 +898,7 @@ class _ActionButtonState extends State<_ActionButton> {
   }
 }
 
-// ── Confirmation dialog helper ────────────────────────────────────────────────
-
+// Confirmation dialog helper
 Future<bool> _showConfirmDialog(
   BuildContext context, {
   required String title,
@@ -1099,8 +1052,7 @@ class _DialogBtnState extends State<_DialogBtn> {
   }
 }
 
-// ── Completed-section filter tab ─────────────────────────────────────────────
-
+// Completed-section filter tab
 class _FilterTab extends StatelessWidget {
   final String label;
   final bool selected;
@@ -1123,11 +1075,11 @@ class _FilterTab extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
         decoration: BoxDecoration(
           color:
-              selected ? AppColors.green.withOpacity(0.14) : Colors.transparent,
+              selected ? AppColors.accent.withOpacity(0.14) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color:
-                selected ? AppColors.green.withOpacity(0.40) : AppColors.border,
+                selected ? AppColors.accent.withOpacity(0.40) : AppColors.border,
           ),
         ),
         child: Row(
@@ -1138,7 +1090,7 @@ class _FilterTab extends StatelessWidget {
               style: AppTextStyles.outfit(
                 fontSize: 10,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected ? AppColors.green : AppColors.muted,
+                color: selected ? AppColors.accent : AppColors.muted,
               ),
             ),
             if (count > 0) ...[
@@ -1149,7 +1101,7 @@ class _FilterTab extends StatelessWidget {
                   fontSize: 9,
                   color:
                       selected
-                          ? AppColors.green.withOpacity(0.75)
+                          ? AppColors.accent.withOpacity(0.75)
                           : AppColors.muted2,
                 ),
               ),
@@ -1161,43 +1113,3 @@ class _FilterTab extends StatelessWidget {
   }
 }
 
-// ── Clear All button ──────────────────────────────────────────────────────────
-
-class _ClearAllBtn extends StatelessWidget {
-  final VoidCallback onTap;
-  const _ClearAllBtn({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-        decoration: BoxDecoration(
-          color: AppColors.red.withOpacity(0.07),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.red.withOpacity(0.28)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.delete_sweep_rounded,
-              size: 11,
-              color: AppColors.red.withOpacity(0.75),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'Clear All',
-              style: AppTextStyles.outfit(
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                color: AppColors.red.withOpacity(0.75),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
@@ -17,6 +17,7 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   String _activeFilter = 'All';
   final TextEditingController _searchCtrl = TextEditingController();
+  DateTime? _selectedDate;
 
   final _filters = ['All', 'Video', 'Audio'];
 
@@ -24,6 +25,42 @@ class _LibraryScreenState extends State<LibraryScreen> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  Map<DateTime, List<DownloadItem>> _groupByDay(List<DownloadItem> items) {
+    final map = <DateTime, List<DownloadItem>>{};
+    for (final item in items) {
+      final key = DateTime(
+          item.createdAt.year, item.createdAt.month, item.createdAt.day);
+      map.putIfAbsent(key, () => []).add(item);
+    }
+    return map;
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? now,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      builder: (ctx, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: ColorScheme.dark(
+            primary: AppColors.accent,
+            onPrimary: Colors.black,
+            surface: AppColors.surface1,
+            onSurface: AppColors.text,
+          ),
+          dialogTheme:
+              const DialogThemeData(backgroundColor: AppColors.surface1),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
   }
 
   @override
@@ -55,6 +92,17 @@ class _LibraryScreenState extends State<LibraryScreen> {
               filtered.where((d) => d.title.toLowerCase().contains(q)).toList();
         }
 
+        if (_selectedDate != null) {
+          filtered = filtered.where((d) {
+            final dDay = DateTime(
+                d.createdAt.year, d.createdAt.month, d.createdAt.day);
+            return dDay == _selectedDate;
+          }).toList();
+        }
+
+        // Sort by newest first before grouping
+        filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
         return Column(
           children: [
             _buildToolbar(completed.length),
@@ -63,7 +111,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               child:
                   filtered.isEmpty
                       ? _buildEmptyState(completed.isEmpty)
-                      : _buildGrid(filtered),
+                      : _buildGroupedGrid(filtered),
             ),
           ],
         );
@@ -133,7 +181,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.greenDim,
+              color: AppColors.accentDim,
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -141,7 +189,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               style: AppTextStyles.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.green,
+                color: AppColors.accent,
               ),
             ),
           ),
@@ -190,7 +238,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(9),
                     borderSide: BorderSide(
-                      color: AppColors.green.withValues(alpha: 0.4),
+                      color: AppColors.accent.withValues(alpha: 0.4),
                     ),
                   ),
                 ),
@@ -214,11 +262,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: isActive ? AppColors.green : AppColors.surface2,
+                      color: isActive ? AppColors.accent : AppColors.surface2,
                       border: Border.all(
                         color:
                             isActive
-                                ? AppColors.green.withValues(alpha: 0.4)
+                                ? AppColors.accent.withValues(alpha: 0.4)
                                 : AppColors.border,
                       ),
                       borderRadius: BorderRadius.circular(8),
@@ -237,77 +285,126 @@ class _LibraryScreenState extends State<LibraryScreen> {
             );
           }),
           const Spacer(),
+          // Date filter button
           MouseRegion(
             cursor: SystemMouseCursors.click,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                border: Border.all(color: AppColors.border),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.sort_rounded,
-                    size: 14,
-                    color: AppColors.muted,
+            child: GestureDetector(
+              onTap: () => _pickDate(context),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _selectedDate != null
+                      ? AppColors.accent.withOpacity(0.12)
+                      : AppColors.surface2,
+                  border: Border.all(
+                    color: _selectedDate != null
+                        ? AppColors.accent.withOpacity(0.4)
+                        : AppColors.border,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Sort',
-                    style: AppTextStyles.outfit(
-                      fontSize: 12,
-                      color: AppColors.muted,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 13,
+                      color: _selectedDate != null
+                          ? AppColors.accent
+                          : AppColors.muted,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 5),
+                    Text(
+                      _selectedDate != null
+                          ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
+                          : 'Date',
+                      style: AppTextStyles.outfit(
+                        fontSize: 12,
+                        color: _selectedDate != null
+                            ? AppColors.accent
+                            : AppColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
+          if (_selectedDate != null) ...[const SizedBox(width: 4),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => setState(() => _selectedDate = null),
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      size: 12, color: AppColors.muted),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildGrid(List<DownloadItem> items) {
-    return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 220,
-        mainAxisSpacing: AppColors.gap,
-        crossAxisSpacing: AppColors.gap,
-        mainAxisExtent: 245,
-      ),
-      itemCount: items.length,
-      itemBuilder: (context, i) {
-        final item = items[i];
-        final isAudio = item.resolution.endsWith('k');
-        return Stack(
-          children: [
-            LibraryCard(
-              title: item.title,
-              meta: '${item.resolution} · ${item.format}',
-              duration: item.formattedDuration,
-              size: item.fileSize ?? '—',
-              isAudio: isAudio,
-              thumbnailUrl: item.thumbnailUrl,
-              outputPath:
-                  item.filePath.isNotEmpty ? item.filePath : item.outputPath,
-              onDoubleTap: () => _openFile(item),
-            ),
-            // Delete button — top-right
-            Positioned(
-              top: 16,
-              right: 8,
-              child: _DeleteBtn(
-                onDelete: () => _confirmDelete(item),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+  Widget _buildGroupedGrid(List<DownloadItem> items) {
+    final grouped = _groupByDay(items);
+    final days = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    final slivers = <Widget>[];
+    for (final day in days) {
+      slivers.add(SliverToBoxAdapter(
+        child: _LibraryDateHeader(date: day),
+      ));
+      final dayItems = grouped[day]!;
+      slivers.add(SliverGrid(
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 220,
+          mainAxisSpacing: AppColors.gap,
+          crossAxisSpacing: AppColors.gap,
+          mainAxisExtent: 245,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, i) {
+            final item = dayItems[i];
+            final isAudio = item.resolution.endsWith('k');
+            return Stack(
+              children: [
+                LibraryCard(
+                  title: item.title,
+                  meta: '${item.resolution} · ${item.format}',
+                  duration: item.formattedDuration,
+                  size: item.fileSize ?? '—',
+                  isAudio: isAudio,
+                  thumbnailUrl: item.thumbnailUrl,
+                  outputPath:
+                      item.filePath.isNotEmpty ? item.filePath : item.outputPath,
+                  onDoubleTap: () => _openFile(item),
+                ),
+                Positioned(
+                  top: 16,
+                  right: 8,
+                  child: _DeleteBtn(onDelete: () => _confirmDelete(item)),
+                ),
+              ],
+            );
+          },
+          childCount: dayItems.length,
+        ),
+      ));
+      slivers.add(
+          const SliverToBoxAdapter(child: SizedBox(height: AppColors.gap)));
+    }
+
+    return CustomScrollView(slivers: slivers);
   }
 
   void _openFile(DownloadItem item) {
@@ -447,6 +544,48 @@ class _DeleteBtnState extends State<_DeleteBtn> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// Date section header for library grid
+class _LibraryDateHeader extends StatelessWidget {
+  final DateTime date;
+  const _LibraryDateHeader({required this.date});
+
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  static String _label(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (date == today) return 'TODAY';
+    if (date == yesterday) return 'YESTERDAY';
+    return '${date.day} ${_months[date.month - 1]} ${date.year}'.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 6),
+      child: Row(
+        children: [
+          Text(
+            _label(date),
+            style: AppTextStyles.outfit(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.muted,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Container(height: 1, color: AppColors.border)),
+        ],
       ),
     );
   }

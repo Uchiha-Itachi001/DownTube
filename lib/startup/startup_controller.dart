@@ -5,6 +5,7 @@ enum StartupStage {
   checking,
   ytDlpMissing,
   locationNeeded,
+  userSetupNeeded,
   ready,
 }
 
@@ -48,6 +49,14 @@ class StartupController extends ChangeNotifier {
       return;
     }
 
+    // Check if user setup has been completed
+    if (!AppState.instance.userSetupDone) {
+      statusMessage = 'Set up your profile…';
+      stage = StartupStage.userSetupNeeded;
+      notifyListeners();
+      return;
+    }
+
     stage = StartupStage.ready;
     statusMessage = 'All systems ready';
     notifyListeners();
@@ -55,6 +64,19 @@ class StartupController extends ChangeNotifier {
 
   Future<void> markLocationSet(String path) async {
     await AppState.instance.setDownloadPath(path);
+    // Continue to user setup check
+    if (!AppState.instance.userSetupDone) {
+      statusMessage = 'Set up your profile…';
+      stage = StartupStage.userSetupNeeded;
+      notifyListeners();
+      return;
+    }
+    stage = StartupStage.ready;
+    statusMessage = 'All systems ready';
+    notifyListeners();
+  }
+
+  Future<void> markUserSetupDone() async {
     stage = StartupStage.ready;
     statusMessage = 'All systems ready';
     notifyListeners();
@@ -73,6 +95,9 @@ class StartupController extends ChangeNotifier {
       if (path == null || path.isEmpty) {
         stage = StartupStage.locationNeeded;
         statusMessage = 'Select a download folder';
+      } else if (!AppState.instance.userSetupDone) {
+        stage = StartupStage.userSetupNeeded;
+        statusMessage = 'Set up your profile…';
       } else {
         stage = StartupStage.ready;
         statusMessage = 'All systems ready';

@@ -143,20 +143,21 @@ class _AppShellState extends State<AppShell>
             },
             width: 280,
             collapsed: false,
+            drawerMode: true,
           ),
         ),
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: RadialGradient(
-            center: Alignment(0.0, -0.9),
+            center: const Alignment(0.0, -0.9),
             radius: 1.4,
             colors: [
-              Color(0xFF0D1F10), // faint dark-green at top
-              Color(0xFF080B08), // near-black mid
-              Color(0xFF060809), // deep base
+              Color.lerp(const Color(0xFF060809), AppColors.accent, 0.12)!, // accent tint at top
+              const Color(0xFF080B08), // near-black mid
+              const Color(0xFF060809), // deep base
             ],
-            stops: [0.0, 0.45, 1.0],
+            stops: const [0.0, 0.45, 1.0],
           ),
         ),
         child: LayoutBuilder(
@@ -174,7 +175,7 @@ class _AppShellState extends State<AppShell>
               padding: const EdgeInsets.all(AppColors.gap),
               child: Column(
                 children: [
-                  // ── Top row: [Logo box] + gap + [Header controls] ──
+                  // Top row: [Logo box] + gap + [Header controls]
                   SizedBox(
                     height: 56,
                     child: Row(
@@ -201,7 +202,7 @@ class _AppShellState extends State<AppShell>
                     ),
                   ),
                   const SizedBox(height: AppColors.gap),
-                  // ── Sidebar + screen content ──
+                  // Sidebar + screen content
                   Expanded(
                     child: Row(
                       children: [
@@ -245,8 +246,12 @@ class _AppShellState extends State<AppShell>
                                           key: ValueKey('$_pendingUrl-$_fetchKey'),
                                           initialUrl: _pendingUrl,
                                           onDownload: () => _onNavSelected(2),
-                                          onQueue: () => _onNavSelected(0),
-                                        ),
+                                          onQueue: () => _onNavSelected(0),                                          onError: () {
+                                            setState(() {
+                                              _selectedIndex = 0;
+                                              _pendingUrl = null;
+                                            });
+                                          },                                        ),
                                       )
                                     : KeyedSubtree(
                                         key: ValueKey(
@@ -255,7 +260,7 @@ class _AppShellState extends State<AppShell>
                                         child: _buildNonAnalyzeScreen(),
                                       ),
                               ),
-                              // ── Refresh overlay ──────────────────────────────
+                              // Refresh overlay
                               if (_isRefreshing)
                                 Positioned.fill(
                                   child: IgnorePointer(
@@ -285,11 +290,11 @@ class _AppShellState extends State<AppShell>
                                               const SizedBox(height: 14),
                                               Text(
                                                 'Refreshing...',
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontFamily: 'Outfit',
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w600,
-                                                  color: AppColors.green,
+                                                  color: AppColors.accent,
                                                 ),
                                               ),
                                             ],
@@ -328,8 +333,8 @@ class _LogoBox extends StatelessWidget {
       width: width,
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.green.withOpacity(0.25)),
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       // OverflowBox + SizedBox(width: width) — same pattern as Sidebar —
@@ -349,10 +354,10 @@ class _LogoBox extends StatelessWidget {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: AppColors.green,
+                      color: AppColors.accent,
                       borderRadius: BorderRadius.circular(9),
                       boxShadow: [
-                        BoxShadow(color: AppColors.greenGlow, blurRadius: 16),
+                        BoxShadow(color: AppColors.accentGlow, blurRadius: 16),
                       ],
                     ),
                     child: const Icon(
@@ -368,10 +373,10 @@ class _LogoBox extends StatelessWidget {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: AppColors.green,
+                        color: AppColors.accent,
                         borderRadius: BorderRadius.circular(9),
                         boxShadow: [
-                          BoxShadow(color: AppColors.greenGlow, blurRadius: 16),
+                          BoxShadow(color: AppColors.accentGlow, blurRadius: 16),
                         ],
                       ),
                       child: const Icon(
@@ -400,7 +405,7 @@ class _LogoBox extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.green,
+                        color: AppColors.accent,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
@@ -422,8 +427,7 @@ class _LogoBox extends StatelessWidget {
   }
 }
 
-// ── Cool glowing spinner for refresh overlay ─────────────────────────────────
-
+// Cool glowing spinner for refresh overlay
 class _GlowSpinner extends StatelessWidget {
   final AnimationController controller;
   const _GlowSpinner({required this.controller});
@@ -451,7 +455,7 @@ class _GlowArcPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const color = AppColors.green;
+    final color = AppColors.accent;
     final rect = Rect.fromLTWH(4, 4, size.width - 8, size.height - 8);
 
     // Glow ring

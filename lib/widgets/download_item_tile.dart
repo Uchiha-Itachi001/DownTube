@@ -22,7 +22,7 @@ class DownloadItemTile extends StatelessWidget {
   bool get _isError => item.status == DownloadStatus.error;
 
   Color get _borderColor {
-    if (_isDownloading) return AppColors.green.withOpacity(0.30);
+    if (_isDownloading) return AppColors.accent.withOpacity(0.30);
     if (_isQueued) return AppColors.yellow.withOpacity(0.25);
     if (_isError) return AppColors.red.withOpacity(0.22);
     return AppColors.border;
@@ -37,7 +37,7 @@ class DownloadItemTile extends StatelessWidget {
         border: Border.all(color: _borderColor, width: _isDownloading ? 1.5 : 1.0),
         borderRadius: BorderRadius.circular(12),
         boxShadow: _isDownloading
-            ? [BoxShadow(color: AppColors.green.withOpacity(0.07), blurRadius: 16)]
+            ? [BoxShadow(color: AppColors.accent.withOpacity(0.07), blurRadius: 16)]
             : null,
       ),
       clipBehavior: Clip.antiAlias,
@@ -95,7 +95,7 @@ class DownloadItemTile extends StatelessWidget {
               style: AppTextStyles.mono(
                 fontSize: 8,
                 fontWeight: FontWeight.w700,
-                color: AppColors.green,
+                color: AppColors.accent,
               ),
             ),
           ),
@@ -109,7 +109,7 @@ class DownloadItemTile extends StatelessWidget {
         ? AppColors.red
         : _isQueued
             ? AppColors.yellow
-            : AppColors.green;
+            : AppColors.accent;
     return Container(
       width: 60,
       height: 60,
@@ -190,7 +190,7 @@ class DownloadItemTile extends StatelessWidget {
           Text(
             phaseLabel,
             style: AppTextStyles.outfit(
-                fontSize: 10, color: AppColors.green),
+                fontSize: 10, color: AppColors.accent),
           ),
         ],
         if (speedEta != null) ...[
@@ -284,7 +284,7 @@ class DownloadItemTile extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.green.withOpacity(0.45),
+                    color: AppColors.accent.withOpacity(0.45),
                     blurRadius: 6,
                   ),
                 ],
@@ -307,8 +307,7 @@ class DownloadItemTile extends StatelessWidget {
   }
 }
 
-// ── Status badge ──────────────────────────────────────────────────────────────
-
+// Status badge
 class _StatusBadge extends StatelessWidget {
   final DownloadStatus status;
   const _StatusBadge({required this.status});
@@ -319,13 +318,13 @@ class _StatusBadge extends StatelessWidget {
       DownloadStatus.downloading => (
         Icons.downloading_rounded,
         'Downloading',
-        AppColors.green.withOpacity(0.10),
-        AppColors.green
+        AppColors.accent.withOpacity(0.10),
+        AppColors.accent
       ),
       DownloadStatus.done => (
         Icons.check_circle_rounded,
         'Done',
-        AppColors.green.withOpacity(0.10),
+        AppColors.accent.withOpacity(0.10),
         const Color(0xFF86EFAC)
       ),
       DownloadStatus.queued => (
@@ -367,8 +366,7 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-// ── Small action button ───────────────────────────────────────────────────────
-
+// Small action button
 class _ActionBtn extends StatelessWidget {
   final IconData icon;
   final Color color;

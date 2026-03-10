@@ -1,4 +1,4 @@
-import 'dart:ui';
+﻿import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
@@ -27,17 +27,17 @@ class AppNotificationCard extends StatelessWidget {
     this.onDismiss,
   });
 
-  // ── Colour palette per type ──────────────────────────────────────
+  // Colour palette per type
   Color get _accent {
     switch (type) {
       case NotificationType.error:
         return AppColors.red;
       case NotificationType.success:
-        return AppColors.green;
+        return AppColors.accent;
       case NotificationType.info:
         return AppColors.blue;
       case NotificationType.loading:
-        return AppColors.green;
+        return AppColors.accent;
     }
   }
 
@@ -104,7 +104,7 @@ class AppNotificationCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── GLOWING LEFT BAR ────────────────────────────────
+                // GLOWING LEFT BAR
                 Container(
                   width: 3,
                   decoration: BoxDecoration(
@@ -125,7 +125,7 @@ class AppNotificationCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                // ── ICON ZONE ────────────────────────────────────────
+                // ICON ZONE
                 Container(
                   width: 56,
                   decoration: BoxDecoration(
@@ -168,7 +168,7 @@ class AppNotificationCard extends StatelessWidget {
                           ),
                   ),
                 ),
-                // ── BODY ─────────────────────────────────────────────
+                // BODY
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
@@ -220,7 +220,7 @@ class AppNotificationCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // ── ACTION + CLOSE ────────────────────────────────────
+                // ACTION + CLOSE
                 Padding(
                   padding: const EdgeInsets.fromLTRB(0, 10, 10, 10),
                   child: Column(
@@ -308,8 +308,7 @@ class _ActionChipState extends State<_ActionChip> {
   }
 }
 
-// ── Helper: show as a floating overlay (replaces SnackBar) ──────────────────
-
+// Helper: show as a floating overlay (replaces SnackBar)
 void showAppNotification(
   BuildContext context, {
   required NotificationType type,
@@ -465,8 +464,7 @@ class _FloatingNotificationState extends State<_FloatingNotification>
   }
 }
 
-// ── Inline status bar variant (used inside the dashboard URL area) ───────────
-
+// Inline status bar variant (used inside the dashboard URL area)
 class AppStatusBar extends StatelessWidget {
   final NotificationType type;
   final String message;

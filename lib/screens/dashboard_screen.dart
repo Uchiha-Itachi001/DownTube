@@ -1,4 +1,4 @@
-import 'dart:math' as math;
+﻿import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/app_colors.dart';
@@ -20,10 +20,10 @@ class DashboardScreen extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: Stack(
         children: [
-          // ── BACKGROUND LAYERS ──
+          // BACKGROUND LAYERS
           // Layer 1: Deep radial base glow
           Positioned.fill(
-            child: CustomPaint(painter: _BgBasePainter()),
+            child: CustomPaint(painter: _BgBasePainter(AppColors.accent)),
           ),
           // Layer 2: Animated grid
           Positioned.fill(child: const _AnimatedGrid()),
@@ -77,7 +77,7 @@ class DashboardScreen extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   border: Border.all(
-                    color: AppColors.green.withOpacity(0.35),
+                    color: AppColors.accent.withOpacity(0.35),
                     width: 1,
                   ),
                   borderRadius: BorderRadius.circular(AppColors.radius),
@@ -94,8 +94,8 @@ class DashboardScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.greenDim,
-        border: Border.all(color: AppColors.green.withOpacity(0.2)),
+        color: AppColors.accentDim,
+        border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -105,9 +105,9 @@ class DashboardScreen extends StatelessWidget {
             width: 7,
             height: 7,
             decoration: BoxDecoration(
-              color: AppColors.green,
+              color: AppColors.accent,
               shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: AppColors.green, blurRadius: 8)],
+              boxShadow: [BoxShadow(color: AppColors.accent, blurRadius: 8)],
             ),
           ),
           const SizedBox(width: 6),
@@ -116,7 +116,7 @@ class DashboardScreen extends StatelessWidget {
             style: AppTextStyles.outfit(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: AppColors.green,
+              color: AppColors.accent,
               letterSpacing: 0.5,
             ),
           ),
@@ -134,7 +134,7 @@ class DashboardScreen extends StatelessWidget {
           const TextSpan(text: 'Download '),
           TextSpan(
             text: 'Anything',
-            style: AppTextStyles.heroTitle.copyWith(color: AppColors.green),
+            style: AppTextStyles.heroTitle.copyWith(color: AppColors.accent),
           ),
           const TextSpan(text: '\nfrom the Internet'),
         ],
@@ -181,7 +181,7 @@ class DashboardScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
       decoration: BoxDecoration(
         color: Colors.transparent,
-        border: Border.all(color: AppColors.green.withOpacity(0.30)),
+        border: Border.all(color: AppColors.accent.withOpacity(0.30)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -251,14 +251,7 @@ class _FeaturePill extends StatefulWidget {
 }
 
 class _FeaturePillState extends State<_FeaturePill> {
-  late bool _selected;
   bool _hovered = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = widget.isSelected;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -266,57 +259,50 @@ class _FeaturePillState extends State<_FeaturePill> {
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: () => setState(() => _selected = !_selected),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
-          decoration: BoxDecoration(
-            color: _selected ? AppColors.greenDim : AppColors.surface2,
-            border: Border.all(
-              color: _selected
-                  ? AppColors.green.withOpacity(0.35)
-                  : (_hovered
-                      ? AppColors.green.withOpacity(0.25)
-                      : AppColors.border),
-            ),
-            borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+        decoration: BoxDecoration(
+          color: _hovered ? AppColors.accentDim : AppColors.surface2,
+          border: Border.all(
+            color: _hovered
+                ? AppColors.accent.withOpacity(0.35)
+                : AppColors.border,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(widget.icon, size: 14, color: _selected || _hovered ? AppColors.green : AppColors.muted),
-              const SizedBox(width: 6),
-              Text(
-                widget.label,
-                style: AppTextStyles.outfit(
-                  fontSize: 12,
-                  color: _selected || _hovered
-                      ? AppColors.green
-                      : AppColors.muted,
-                ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(widget.icon, size: 14, color: _hovered ? AppColors.accent : AppColors.muted),
+            const SizedBox(width: 6),
+            Text(
+              widget.label,
+              style: AppTextStyles.outfit(
+                fontSize: 12,
+                color: _hovered ? AppColors.accent : AppColors.muted,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// BACKGROUND ANIMATION WIDGETS
-// ══════════════════════════════════════════════════════════════
-
-// Layer 1 — Static radial base glow
+// // BACKGROUND ANIMATION WIDGETS
+// // Layer 1 — Static radial base glow
 class _BgBasePainter extends CustomPainter {
+  final Color color;
+  _BgBasePainter(this.color);
+
   @override
   void paint(Canvas canvas, Size size) {
-    // Top-center large emerald glow
+    // Top-center large accent glow
     final paint1 = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFF14532D).withOpacity(0.55),
+          color.withValues(alpha: 0.15),
           Colors.transparent,
         ],
         radius: 0.6,
@@ -330,7 +316,7 @@ class _BgBasePainter extends CustomPainter {
     final paint2 = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFF0F3C1E).withOpacity(0.35),
+          color.withValues(alpha: 0.08),
           Colors.transparent,
         ],
         radius: 0.5,
@@ -342,7 +328,7 @@ class _BgBasePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_BgBasePainter old) => false;
+  bool shouldRepaint(_BgBasePainter old) => old.color != color;
 }
 
 // Layer 2 — Animated scrolling grid
@@ -391,7 +377,7 @@ class _GridPainter extends CustomPainter {
     const gridSize = 60.0;
     final offset = t * gridSize;
     final paint = Paint()
-      ..color = const Color(0xFF22C55E).withOpacity(0.10)
+      ..color = AppColors.accent.withValues(alpha: 0.10)
       ..strokeWidth = 1;
 
     for (double x = -gridSize + offset; x < size.width + gridSize; x += gridSize) {
@@ -456,7 +442,7 @@ class _FloatingOrbsState extends State<_FloatingOrbs>
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          const Color(0xFF22C55E).withOpacity(0.18),
+                          AppColors.accent.withValues(alpha: 0.18),
                           Colors.transparent,
                         ],
                       ),
@@ -476,7 +462,7 @@ class _FloatingOrbsState extends State<_FloatingOrbs>
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF14B874).withOpacity(0.10),
+                      AppColors.accent.withValues(alpha: 0.10),
                       Colors.transparent,
                     ],
                   ),
@@ -494,7 +480,7 @@ class _FloatingOrbsState extends State<_FloatingOrbs>
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF10B981).withOpacity(0.08),
+                      AppColors.accent.withValues(alpha: 0.08),
                       Colors.transparent,
                     ],
                   ),
@@ -559,7 +545,7 @@ class _HexRingPainter extends CustomPainter {
     canvas.translate(cx, cy);
     canvas.rotate(t * 2 * math.pi);
     final paint1 = Paint()
-      ..color = const Color(0xFF22C55E).withOpacity(0.07)
+      ..color = AppColors.accent.withValues(alpha: 0.07)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     canvas.drawCircle(Offset.zero, 350, paint1);
@@ -570,7 +556,7 @@ class _HexRingPainter extends CustomPainter {
     canvas.translate(cx, cy);
     canvas.rotate(-t * 2 * math.pi * 1.5);
     final paint2 = Paint()
-      ..color = const Color(0xFF22C55E).withOpacity(0.04)
+      ..color = AppColors.accent.withValues(alpha: 0.04)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
     final path = Path();
@@ -652,7 +638,7 @@ class _BeamPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          const Color(0xFF22C55E).withOpacity(0.07),
+          AppColors.accent.withValues(alpha: 0.07),
           Colors.transparent,
         ],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height * 0.5));
@@ -664,8 +650,8 @@ class _BeamPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          const Color(0xFF22C55E).withOpacity(0.6),
-          const Color(0xFF22C55E).withOpacity(0.15),
+          AppColors.accent.withValues(alpha: 0.6),
+          AppColors.accent.withValues(alpha: 0.15),
           Colors.transparent,
         ],
         stops: const [0, 0.2, 0.6],
@@ -763,7 +749,7 @@ class _ParticlePainter extends CustomPainter {
       if (progress < 0.1) opacity *= progress / 0.1;
       if (progress > 0.9) opacity *= (1.0 - progress) / 0.1;
       final paint = Paint()
-        ..color = const Color(0xFF22C55E).withOpacity(opacity.clamp(0, 1));
+        ..color = AppColors.accent.withValues(alpha: opacity.clamp(0, 1));
       canvas.drawCircle(
         Offset(p.x * size.width, p.y * size.height),
         p.size / 2,
@@ -862,7 +848,7 @@ class _StreamPainter extends CustomPainter {
           end: Alignment.bottomCenter,
           colors: [
             Colors.transparent,
-            const Color(0xFF22C55E).withOpacity(s.opacity),
+            AppColors.accent.withValues(alpha: s.opacity),
             Colors.transparent,
           ],
         ).createShader(Rect.fromLTWH(cx - 1, top, 2, bottom - top))

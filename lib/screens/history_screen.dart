@@ -9,22 +9,98 @@ import '../widgets/stat_tile.dart';
 import '../widgets/sparkline_chart.dart';
 import '../widgets/app_notification.dart';
 
-class HistoryScreen extends StatelessWidget {
+enum _HistoryDateFilter { today, week, all }
+
+class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  _HistoryDateFilter _filter = _HistoryDateFilter.all;
+  DateTime? _pickedDate;
+
+  // ---- filter helpers ----
+
+  List<DownloadItem> _applyFilter(List<DownloadItem> all) {
+    if (_pickedDate != null) {
+      return all.where((d) {
+        final dDay =
+            DateTime(d.createdAt.year, d.createdAt.month, d.createdAt.day);
+        return dDay == _pickedDate;
+      }).toList();
+    }
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    return switch (_filter) {
+      _HistoryDateFilter.today =>
+        all.where((d) => d.createdAt.isAfter(todayStart)).toList(),
+      _HistoryDateFilter.week => all
+          .where((d) => d.createdAt
+              .isAfter(todayStart.subtract(const Duration(days: 7))))
+          .toList(),
+      _HistoryDateFilter.all => all,
+    };
+  }
+
+  Map<DateTime, List<DownloadItem>> _groupByDay(List<DownloadItem> items) {
+    final map = <DateTime, List<DownloadItem>>{};
+    for (final item in items) {
+      final key = DateTime(
+          item.createdAt.year, item.createdAt.month, item.createdAt.day);
+      map.putIfAbsent(key, () => []).add(item);
+    }
+    return map;
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _pickedDate ?? now,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      builder: (ctx, child) => Theme(
+        data: ThemeData.dark().copyWith(
+          colorScheme: ColorScheme.dark(
+            primary: AppColors.accent,
+            onPrimary: Colors.black,
+            surface: AppColors.surface1,
+            onSurface: AppColors.text,
+          ),
+          dialogTheme: const DialogThemeData(
+            backgroundColor: AppColors.surface1,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _pickedDate = picked);
+    }
+  }
+
+  // ---- build ----
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: AppState.instance,
       builder: (context, _) {
-        final history = AppState.instance.downloads
+        final allHistory = AppState.instance.downloads
             .where((d) =>
                 (d.status == DownloadStatus.done ||
-                 d.status == DownloadStatus.error) &&
+                    d.status == DownloadStatus.error) &&
                 d.showInHistory)
-            .toList();
-        final done = history.where((d) => d.status == DownloadStatus.done).length;
-        final failed = history.where((d) => d.status == DownloadStatus.error).length;
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        final filtered = _applyFilter(allHistory);
+        final done =
+            allHistory.where((d) => d.status == DownloadStatus.done).length;
+        final failed =
+            allHistory.where((d) => d.status == DownloadStatus.error).length;
 
         return LayoutBuilder(builder: (context, constraints) {
           final narrow = constraints.maxWidth < 750;
@@ -32,9 +108,9 @@ class HistoryScreen extends StatelessWidget {
             return SingleChildScrollView(
               child: Column(
                 children: [
-                  _buildHeaderCard(context, history),
+                  _buildHeaderCard(allHistory, filtered),
                   const SizedBox(height: AppColors.gap),
-                  _buildHistoryList(context, history, shrinkWrap: true),
+                  _buildHistoryList(filtered, shrinkWrap: true),
                   const SizedBox(height: AppColors.gap),
                   _buildAllTimeStats(done, failed),
                   const SizedBox(height: AppColors.gap),
@@ -46,19 +122,17 @@ class HistoryScreen extends StatelessWidget {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Main area
               Expanded(
                 flex: 3,
                 child: Column(
                   children: [
-                    _buildHeaderCard(context, history),
+                    _buildHeaderCard(allHistory, filtered),
                     const SizedBox(height: AppColors.gap),
-                    Expanded(child: _buildHistoryList(context, history)),
+                    Expanded(child: _buildHistoryList(filtered)),
                   ],
                 ),
               ),
               const SizedBox(width: AppColors.gap),
-              // Side panel
               SizedBox(
                 width: 260,
                 child: SingleChildScrollView(
@@ -78,7 +152,8 @@ class HistoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeaderCard(BuildContext context, List<DownloadItem> history) {
+  Widget _buildHeaderCard(
+      List<DownloadItem> allHistory, List<DownloadItem> filtered) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
@@ -86,56 +161,75 @@ class HistoryScreen extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Download History',
-            style: AppTextStyles.syne(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.greenDim,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              '${history.length} total',
-              style: AppTextStyles.outfit(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.green,
+          // Title row
+          Row(
+            children: [
+              Text(
+                'Download History',
+                style: AppTextStyles.syne(
+                    fontSize: 16, fontWeight: FontWeight.w700),
               ),
-            ),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.accentDim,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${filtered.length} shown',
+                  style: AppTextStyles.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              _ClearAllButton(hasHistory: allHistory.isNotEmpty),
+            ],
           ),
-          const Spacer(),
-          _headerAction('Export'),
-          const SizedBox(width: 8),
-          _ClearAllButton(hasHistory: history.isNotEmpty),
+          const SizedBox(height: 10),
+          // Filter row
+          Row(
+            children: [
+              // Preset pills
+              for (final (label, val) in [
+                ('Today', _HistoryDateFilter.today),
+                ('This Week', _HistoryDateFilter.week),
+                ('All Time', _HistoryDateFilter.all),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: _FilterPill(
+                    label: label,
+                    isActive: _pickedDate == null && _filter == val,
+                    onTap: () =>
+                        setState(() {
+                          _filter = val;
+                          _pickedDate = null;
+                        }),
+                  ),
+                ),
+              // Date picker button
+              _DatePickerBtn(
+                picked: _pickedDate,
+                onTap: () => _pickDate(context),
+                onClear: () => setState(() => _pickedDate = null),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _headerAction(String label) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.surface2,
-          border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHistoryList(BuildContext context, List<DownloadItem> history, {bool shrinkWrap = false}) {
+  Widget _buildHistoryList(List<DownloadItem> history,
+      {bool shrinkWrap = false}) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface1,
@@ -144,20 +238,36 @@ class HistoryScreen extends StatelessWidget {
       ),
       child: history.isEmpty
           ? _buildEmptyHistory()
-          : ListView.separated(
-              shrinkWrap: shrinkWrap,
-              physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
-              padding: const EdgeInsets.all(6),
-              itemCount: history.length,
-              separatorBuilder: (_, __) => const Divider(
-                height: 1,
-                color: AppColors.border,
-                indent: 12,
-                endIndent: 12,
-              ),
-              itemBuilder: (context, i) =>
-                  _HistoryTile(item: history[i], index: i + 1),
-            ),
+          : _buildGroupedList(history, shrinkWrap: shrinkWrap),
+    );
+  }
+
+  Widget _buildGroupedList(List<DownloadItem> history,
+      {bool shrinkWrap = false}) {
+    final grouped = _groupByDay(history);
+    final days = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    final rows = <Widget>[];
+    var globalIndex = 0;
+    for (final day in days) {
+      rows.add(_HistoryDateHeader(date: day));
+      final dayItems = grouped[day]!;
+      for (int i = 0; i < dayItems.length; i++) {
+        globalIndex++;
+        rows.add(_HistoryTile(item: dayItems[i], index: globalIndex));
+        if (i < dayItems.length - 1) {
+          rows.add(const Divider(
+              height: 1, color: AppColors.border, indent: 12, endIndent: 12));
+        }
+      }
+    }
+
+    return ListView(
+      shrinkWrap: shrinkWrap,
+      physics:
+          shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.all(6),
+      children: rows,
     );
   }
 
@@ -177,16 +287,20 @@ class HistoryScreen extends StatelessWidget {
                 border: Border.all(color: AppColors.border),
               ),
               child: const Center(
-                child: Icon(Icons.history_rounded, size: 26, color: AppColors.muted2),
+                child: Icon(Icons.history_rounded,
+                    size: 26, color: AppColors.muted2),
               ),
             ),
             const SizedBox(height: 14),
             Text('No history yet',
                 style: AppTextStyles.outfit(
-                    fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.muted)),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted)),
             const SizedBox(height: 5),
             Text('Completed downloads will appear here',
-                style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted2),
+                style:
+                    AppTextStyles.outfit(fontSize: 11, color: AppColors.muted2),
                 textAlign: TextAlign.center),
           ],
         ),
@@ -203,19 +317,27 @@ class HistoryScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: StatTile(value: '$total', label: 'Total Downloads', unit: '')),
+              Expanded(
+                  child: StatTile(
+                      value: '$total', label: 'Total Downloads', unit: '')),
               const SizedBox(width: 8),
-              Expanded(child: StatTile(value: '$done', label: 'Successful', unit: '')),
+              Expanded(
+                  child: StatTile(
+                      value: '$done', label: 'Successful', unit: '')),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: StatTile(value: '$failed', label: 'Failed', unit: '')),
+              Expanded(
+                  child:
+                      StatTile(value: '$failed', label: 'Failed', unit: '')),
               const SizedBox(width: 8),
               Expanded(
                   child: StatTile(
-                      value: rate.toStringAsFixed(0), label: 'Success Rate', unit: '%')),
+                      value: rate.toStringAsFixed(0),
+                      label: 'Success Rate',
+                      unit: '%')),
             ],
           ),
         ],
@@ -224,6 +346,22 @@ class HistoryScreen extends StatelessWidget {
   }
 
   Widget _buildWeeklyChart() {
+    final now = DateTime.now();
+    // Count downloads per day for the last 7 days (Mon..Sun relative to today)
+    final counts = List<double>.filled(7, 0);
+    for (final d in AppState.instance.downloads) {
+      final diff = now.difference(d.createdAt).inDays;
+      if (diff >= 0 && diff < 7) {
+        counts[6 - diff] += 1;
+      }
+    }
+    // Day labels starting from 6 days ago up to today
+    final labels = List.generate(7, (i) {
+      final day = now.subtract(Duration(days: 6 - i));
+      const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return names[day.weekday - 1];
+    });
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -244,16 +382,14 @@ class HistoryScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          const SparklineChart(
-            values: [4, 7, 3, 8, 5, 12, 6],
-            height: 70,
-          ),
+          SparklineChart(values: counts, height: 70),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+            children: labels
                 .map((d) => Text(d,
-                    style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted2)))
+                    style: AppTextStyles.outfit(
+                        fontSize: 10, color: AppColors.muted2)))
                 .toList(),
           ),
         ],
@@ -262,7 +398,174 @@ class HistoryScreen extends StatelessWidget {
   }
 }
 
-// â”€â”€ Clear All button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Date section header inside history list
+class _HistoryDateHeader extends StatelessWidget {
+  final DateTime date;
+  const _HistoryDateHeader({required this.date});
+
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  static String _label(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (date == today) return 'TODAY';
+    if (date == yesterday) return 'YESTERDAY';
+    return '${date.day} ${_months[date.month - 1]} ${date.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+      child: Row(
+        children: [
+          Text(
+            _label(date),
+            style: AppTextStyles.outfit(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppColors.muted,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Container(height: 1, color: AppColors.border)),
+        ],
+      ),
+    );
+  }
+}
+
+// -- Small filter pill
+class _FilterPill extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+  const _FilterPill(
+      {required this.label, required this.isActive, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.accent : AppColors.surface2,
+            border: Border.all(
+              color: isActive
+                  ? AppColors.accent.withOpacity(0.4)
+                  : AppColors.border,
+            ),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Text(
+            label,
+            style: AppTextStyles.outfit(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: isActive ? Colors.black : AppColors.muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// -- Date picker button
+class _DatePickerBtn extends StatelessWidget {
+  final DateTime? picked;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+  const _DatePickerBtn(
+      {required this.picked, required this.onTap, required this.onClear});
+
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+
+  String get _label => picked == null
+      ? 'Pick date'
+      : '${picked!.day} ${_months[picked!.month - 1]} ${picked!.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = picked != null;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: onTap,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? AppColors.accent.withOpacity(0.12)
+                    : AppColors.surface2,
+                border: Border.all(
+                  color: isActive
+                      ? AppColors.accent.withOpacity(0.4)
+                      : AppColors.border,
+                ),
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.calendar_today_rounded,
+                      size: 11,
+                      color: isActive ? AppColors.accent : AppColors.muted),
+                  const SizedBox(width: 5),
+                  Text(
+                    _label,
+                    style: AppTextStyles.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: isActive ? AppColors.accent : AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (isActive) ...[
+          const SizedBox(width: 4),
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: onClear,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  border: Border.all(color: AppColors.border),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: const Icon(Icons.close_rounded,
+                    size: 11, color: AppColors.muted),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// Clear All button 
 
 class _ClearAllButton extends StatefulWidget {
   final bool hasHistory;
@@ -399,7 +702,7 @@ class _ClearAllButtonState extends State<_ClearAllButton> {
   }
 }
 
-// â”€â”€ History tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// History tile 
 
 class _HistoryTile extends StatefulWidget {
   final DownloadItem item;
@@ -517,10 +820,10 @@ class _HistoryTileState extends State<_HistoryTile> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final success = item.status == DownloadStatus.done;
-    final subtitle = '${item.resolution} Â· ${item.format}';
+    final subtitle = '${item.resolution} · ${item.format}';
     final time = _relTime(item.createdAt);
     final isAudio = item.resolution.endsWith('k');
-    final accent = isAudio ? const Color(0xFF3B82F6) : AppColors.green;
+    final accent = isAudio ? const Color(0xFF3B82F6) : AppColors.accent;
 
     return GestureDetector(
       onDoubleTap: success ? () => _openFile(item) : null,
@@ -536,7 +839,7 @@ class _HistoryTileState extends State<_HistoryTile> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
-            // â”€â”€ Index â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Index 
             SizedBox(
               width: 28,
               child: Text(
@@ -545,7 +848,7 @@ class _HistoryTileState extends State<_HistoryTile> {
                     fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted2),
               ),
             ),
-            // â”€â”€ Thumbnail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Thumbnail 
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: SizedBox(
@@ -561,7 +864,7 @@ class _HistoryTileState extends State<_HistoryTile> {
               ),
             ),
             const SizedBox(width: 12),
-            // â”€â”€ Title + meta â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Title + meta 
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -608,17 +911,17 @@ class _HistoryTileState extends State<_HistoryTile> {
               ),
             ),
             const SizedBox(width: 12),
-            // â”€â”€ Status pill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Status pill 
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: success
-                    ? AppColors.greenDim
+                    ? AppColors.accentDim
                     : const Color(0xFFEF4444).withOpacity(0.12),
                 borderRadius: BorderRadius.circular(5),
                 border: Border.all(
                   color: success
-                      ? AppColors.green.withOpacity(0.3)
+                      ? AppColors.accent.withOpacity(0.3)
                       : const Color(0xFFEF4444).withOpacity(0.3),
                 ),
               ),
@@ -630,7 +933,7 @@ class _HistoryTileState extends State<_HistoryTile> {
                         ? (isAudio ? Icons.music_note_rounded : Icons.check_rounded)
                         : Icons.close_rounded,
                     size: 10,
-                    color: success ? AppColors.green : const Color(0xFFEF4444),
+                    color: success ? AppColors.accent : const Color(0xFFEF4444),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -638,14 +941,14 @@ class _HistoryTileState extends State<_HistoryTile> {
                     style: AppTextStyles.outfit(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: success ? AppColors.green : const Color(0xFFEF4444),
+                      color: success ? AppColors.accent : const Color(0xFFEF4444),
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 10),
-            // â”€â”€ Delete action â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // Delete action 
             AnimatedOpacity(
               opacity: _hovered ? 1.0 : 0.35,
               duration: const Duration(milliseconds: 150),
