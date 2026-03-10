@@ -1,4 +1,6 @@
 # youtube_downloder
+ This is the Version 1.0 of the youtube_downloder, a powerful and user-friendly application designed to download videos from YouTube with ease. With its intuitive interface and robust features, users can quickly and efficiently save their favorite YouTube content for offline viewing. Whether you're looking to download music videos, tutorials, or any other type of content, youtube_downloder provides a seamless experience for all your downloading needs.
+  in this relese ther is mainly the UI of the app and the download function is not yet implemented but it will be added in the next releases.
 
 A new Flutter project.
 
