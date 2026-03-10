@@ -232,8 +232,10 @@ class AppState extends ChangeNotifier {
                 line.contains('[ExtractAudio] Destination:')))) {
           // Capture final merged / converted path
           if (line.contains('Merging formats')) {
-            final m = RegExp(r'into "(.+)"').firstMatch(line);
-            if (m != null) _mergeDest = m.group(1);
+            final idx = line.indexOf('into ');
+            if (idx != -1) {
+              _mergeDest = line.substring(idx + 5).trim().replaceAll('"', '');
+            }
           } else if (line.contains('Destination:')) {
             // audio-only: [ffmpeg] or [ExtractAudio] Destination: path
             _ffmpegDest = line.substring(line.indexOf('Destination:') + 'Destination:'.length).trim();
@@ -312,12 +314,14 @@ class AppState extends ChangeNotifier {
         type: DownloadNotifType.mergeDone,
       ));
       // Persist to SQLite
-      try {
-        await DownloadDb.save(item);
-      } catch (_) {}
+      await DownloadDb.save(item);
     } catch (e) {
       item.status = DownloadStatus.error;
       item.errorMessage = e.toString();
+      // Persist failed downloads so they survive a restart and appear in
+      // history. They are never touched by cleanMissing() and can only be
+      // removed by explicit delete.
+      await DownloadDb.save(item);
     }
     notifyListeners();
   }
@@ -337,7 +341,7 @@ class AppState extends ChangeNotifier {
   }
 
   // ── Cancel download ───────────────────────────────────────────────────────
-  void cancelDownload(String id) {
+  Future<void> cancelDownload(String id) async {
     ytDlp.killDownload(id);
     final idx = downloads.indexWhere((d) => d.id == id);
     if (idx == -1) return;
@@ -345,6 +349,8 @@ class AppState extends ChangeNotifier {
     downloads[idx].phase = DownloadPhase.complete;
     downloads[idx].errorMessage = 'Cancelled';
     downloads[idx].progress = 0.0;
+    // Persist the cancelled item so it shows in history after restart.
+    await DownloadDb.save(downloads[idx]);
     notifyListeners();
   }
 

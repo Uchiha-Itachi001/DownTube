@@ -367,6 +367,11 @@ class _HoverContainerState extends State<_HoverContainer> {
 }
 
 // ── Download header button ────────────────────────────────────────────────────
+// Dropdown uses OverlayEntry + CompositedTransformFollower so it is always
+// rendered above ALL widgets on screen regardless of parent clip bounds.
+// The Align(topRight) wrapper inside the follower is critical — without it,
+// CompositedTransformFollower gives its child tight full-screen constraints,
+// causing the panel to expand to the whole screen.
 
 class _DownloadHeaderBtn extends StatefulWidget {
   const _DownloadHeaderBtn();
@@ -376,20 +381,52 @@ class _DownloadHeaderBtn extends StatefulWidget {
 }
 
 class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
-  bool _hovered = false;
+  bool _cursorOnButton = false;
+  bool _cursorOnDropdown = false;
   OverlayEntry? _overlayEntry;
   final LayerLink _layerLink = LayerLink();
 
-  void _showOverlay(List<DownloadItem> activeItems) {
-    _removeOverlay();
+  bool get _hovered => _cursorOnButton || _cursorOnDropdown;
+
+  void _onButtonEnter() {
+    _cursorOnButton = true;
+    if (_overlayEntry == null) _showOverlay();
+    setState(() {});
+  }
+
+  void _onButtonExit() {
+    _cursorOnButton = false;
+    _scheduleHide();
+  }
+
+  void _onDropdownEnter() {
+    if (!_cursorOnDropdown) {
+      _cursorOnDropdown = true;
+      setState(() {});
+    }
+  }
+
+  void _onDropdownExit() {
+    _cursorOnDropdown = false;
+    _scheduleHide();
+  }
+
+  void _scheduleHide() {
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (!mounted) return;
+      if (!_hovered) {
+        _removeOverlay();
+        setState(() {});
+      }
+    });
+  }
+
+  void _showOverlay() {
     _overlayEntry = OverlayEntry(
-      builder: (_) => _DownloadOverlayPanel(
+      builder: (_) => _DownloadDropdownOverlay(
         link: _layerLink,
-        activeItems: activeItems,
-        onExit: () {
-          _removeOverlay();
-          setState(() => _hovered = false);
-        },
+        onEnter: _onDropdownEnter,
+        onExit: _onDropdownExit,
       ),
     );
     Overlay.of(context).insert(_overlayEntry!);
@@ -413,7 +450,6 @@ class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
       builder: (_, __) {
         final downloads = AppState.instance.downloads;
 
-        // Pick the actively downloading item first, then first queued
         DownloadItem? current;
         for (final d in downloads) {
           if (d.status == DownloadStatus.downloading) {
@@ -422,236 +458,163 @@ class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
           }
         }
         current ??=
-            downloads
-                .where((d) => d.status == DownloadStatus.queued)
-                .firstOrNull;
+            downloads.where((d) => d.status == DownloadStatus.queued).firstOrNull;
 
         final isActive = current != null;
         final pct =
             isActive ? (current!.progress * 100).clamp(0, 100).toInt() : 0;
-        final activeItems =
-            downloads
-                .where(
-                  (d) =>
-                      d.status == DownloadStatus.downloading ||
-                      d.status == DownloadStatus.queued,
-                )
-                .toList();
-        final queuedCount = activeItems.length;
-
-        // Detect audio for main progress bar color
+        final queuedCount = downloads
+            .where((d) =>
+                d.status == DownloadStatus.downloading ||
+                d.status == DownloadStatus.queued)
+            .length;
         final bool currentIsAudio =
             isActive && current!.resolution.endsWith('k');
         final Color mainAccent =
             currentIsAudio ? const Color(0xFF3B82F6) : AppColors.green;
 
-        // Update overlay when data changes
-        if (_hovered && queuedCount > 1 && _overlayEntry != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-            _overlayEntry?.markNeedsBuild();
-          });
-        }
-        // Remove overlay when no longer relevant
-        if (_overlayEntry != null && queuedCount <= 1) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _removeOverlay();
-          });
-        }
-
         return CompositedTransformTarget(
           link: _layerLink,
           child: MouseRegion(
-            onEnter: (_) {
-              setState(() => _hovered = true);
-              if (queuedCount > 1) {
-                _showOverlay(activeItems);
-              }
-            },
-            onExit: (_) {
-              // Small delay to allow moving to the overlay panel
-              Future.delayed(const Duration(milliseconds: 100), () {
-                if (!_hovered || !mounted) return;
-                // Will be cancelled if mouse enters overlay
-              });
-              setState(() => _hovered = false);
-              _removeOverlay();
-            },
+            onEnter: (_) => _onButtonEnter(),
+            onExit: (_) => _onButtonExit(),
             child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          height: 36,
-          width: isActive ? 230 : 38,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            border: Border.all(
-              color:
-                  isActive
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              height: 36,
+              width: isActive ? 230 : 38,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                border: Border.all(
+                  color: isActive
                       ? mainAccent.withOpacity(0.40)
                       : AppColors.border,
-            ),
-            borderRadius: BorderRadius.circular(9),
-          ),
-          child: Row(
-            children: [
-              // ── Icon section (always 34 px wide) ─────────────────────────
-              SizedBox(
-                width: 36,
-                height: 36,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Center(
-                      child: Icon(
-                        Icons.download_rounded,
-                        size: 16,
-                        color: isActive ? mainAccent : AppColors.muted,
-                      ),
-                    ),
-                    if (queuedCount > 0)
-                      Positioned(
-                        top: 5,
-                        right: 4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 3,
-                            vertical: 1,
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 14,
-                            minHeight: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: mainAccent,
-                            borderRadius: BorderRadius.circular(7),
-                            border: Border.all(
-                              color: AppColors.surface2,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Text(
-                            '$queuedCount',
-                            style: AppTextStyles.outfit(
-                              fontSize: 8,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.black,
-                            ),
-                            textAlign: TextAlign.center,
+                ),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Row(
+                children: [
+                  // Icon + badge
+                  SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Center(
+                          child: Icon(
+                            Icons.download_rounded,
+                            size: 16,
+                            color: isActive ? mainAccent : AppColors.muted,
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-              // ── Expanded section (always in layout so Row never overflows)
-              Expanded(
-                child:
-                    isActive
-                        ? Row(
-                          children: [
-                            Container(
-                              width: 1,
-                              height: 20,
-                              color: AppColors.border,
-                            ),
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
+                        if (queuedCount > 0)
+                          Positioned(
+                            top: 5,
+                            right: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 3, vertical: 1),
+                              constraints: const BoxConstraints(
+                                  minWidth: 14, minHeight: 14),
+                              decoration: BoxDecoration(
+                                color: mainAccent,
+                                borderRadius: BorderRadius.circular(7),
+                                border: Border.all(
+                                    color: AppColors.surface2, width: 1.5),
+                              ),
+                              child: Text(
+                                '$queuedCount',
+                                style: AppTextStyles.outfit(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black,
                                 ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Title + percentage
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            current!.title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: AppTextStyles.outfit(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.text,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '$pct%',
-                                          style: AppTextStyles.outfit(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w700,
-                                            color: mainAccent,
-                                          ),
-                                        ),
-                                        if (queuedCount > 1) ...[
-                                          const SizedBox(width: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                              vertical: 1,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: mainAccent
-                                                  .withOpacity(0.15),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  // Progress section
+                  Expanded(
+                    child: isActive
+                        ? Row(
+                            children: [
+                              Container(
+                                  width: 1,
+                                  height: 20,
+                                  color: AppColors.border),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8),
+                                  child: Column(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
                                             child: Text(
-                                              '+${queuedCount - 1}',
+                                              current!.title,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
                                               style: AppTextStyles.outfit(
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.w700,
-                                                color: mainAccent,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.text,
                                               ),
                                             ),
                                           ),
-                                        ],
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    // Smooth progress bar
-                                    TweenAnimationBuilder<double>(
-                                      tween: Tween(
-                                        begin: 0,
-                                        end: current!.progress,
-                                      ),
-                                      duration: const Duration(
-                                        milliseconds: 400,
-                                      ),
-                                      curve: Curves.easeOut,
-                                      builder:
-                                          (_, v, __) => ClipRRect(
-                                            borderRadius: BorderRadius.circular(
-                                              2,
-                                            ),
-                                            child: LinearProgressIndicator(
-                                              value: v,
-                                              backgroundColor: AppColors
-                                                  .surface2
-                                                  .withOpacity(0.6),
-                                              valueColor:
-                                                  AlwaysStoppedAnimation(
-                                                    mainAccent,
-                                                  ),
-                                              minHeight: 3,
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '$pct%',
+                                            style: AppTextStyles.outfit(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: mainAccent,
                                             ),
                                           ),
-                                    ),
-                                  ],
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      TweenAnimationBuilder<double>(
+                                        tween: Tween(
+                                            begin: 0,
+                                            end: current!.progress),
+                                        duration: const Duration(
+                                            milliseconds: 400),
+                                        curve: Curves.easeOut,
+                                        builder: (_, v, __) => ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(2),
+                                          child: LinearProgressIndicator(
+                                            value: v,
+                                            backgroundColor: AppColors
+                                                .surface2
+                                                .withOpacity(0.6),
+                                            valueColor:
+                                                AlwaysStoppedAnimation(
+                                                    mainAccent),
+                                            minHeight: 3,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        )
+                            ],
+                          )
                         : const SizedBox.shrink(),
+                  ),
+                ],
               ),
-            ],
-          ),
             ),
           ),
         );
@@ -660,144 +623,146 @@ class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
   }
 }
 
-/// Overlay panel showing all active downloads — renders above all other widgets.
-class _DownloadOverlayPanel extends StatefulWidget {
+// ── Overlay wrapper ───────────────────────────────────────────────────────────
+// Align(topRight) lets the child measure its own intrinsic size. Without it,
+// CompositedTransformFollower passes tight full-screen constraints down and the
+// panel renders as a full-screen-sized box.
+
+class _DownloadDropdownOverlay extends StatelessWidget {
   final LayerLink link;
-  final List<DownloadItem> activeItems;
+  final VoidCallback onEnter;
   final VoidCallback onExit;
 
-  const _DownloadOverlayPanel({
+  const _DownloadDropdownOverlay({
     required this.link,
-    required this.activeItems,
+    required this.onEnter,
     required this.onExit,
   });
 
   @override
-  State<_DownloadOverlayPanel> createState() => _DownloadOverlayPanelState();
-}
-
-class _DownloadOverlayPanelState extends State<_DownloadOverlayPanel> {
-  bool _insidePanel = false;
-
-  @override
   Widget build(BuildContext context) {
     return CompositedTransformFollower(
-      link: widget.link,
+      link: link,
       targetAnchor: Alignment.bottomRight,
       followerAnchor: Alignment.topRight,
-      offset: const Offset(0, 4),
-      child: MouseRegion(
-        onEnter: (_) => _insidePanel = true,
-        onExit: (_) {
-          _insidePanel = false;
-          widget.onExit();
-        },
-        child: ListenableBuilder(
-          listenable: AppState.instance,
-          builder: (_, __) {
-            final activeItems = AppState.instance.downloads
-                .where((d) =>
-                    d.status == DownloadStatus.downloading ||
-                    d.status == DownloadStatus.queued)
-                .toList();
-            if (activeItems.isEmpty) return const SizedBox.shrink();
-            return Material(
-              color: Colors.transparent,
-              child: Container(
-                width: 250,
-                constraints: const BoxConstraints(minHeight: 72, maxHeight: 144),
-                decoration: BoxDecoration(
-                  color: AppColors.surface1,
-                  border:
-                      Border.all(color: AppColors.green.withOpacity(0.25)),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.45),
-                      blurRadius: 24,
-                      spreadRadius: 4,
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: activeItems.map((d) {
-                        final dp =
-                            (d.progress * 100).clamp(0, 100).toInt();
-                        final isAudio = d.resolution.endsWith('k');
-                        final accent = isAudio
-                            ? const Color(0xFF3B82F6)
-                            : AppColors.green;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    d.status == DownloadStatus.queued
-                                        ? Icons.hourglass_top_rounded
-                                        : Icons.download_rounded,
-                                    size: 12,
-                                    color:
-                                        d.status == DownloadStatus.queued
-                                            ? const Color(0xFFEAB308)
-                                            : accent,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      d.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: AppTextStyles.outfit(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.text,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '$dp%',
-                                    style: AppTextStyles.outfit(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: accent,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(2),
-                                child: LinearProgressIndicator(
-                                  value: d.progress.clamp(0.0, 1.0),
-                                  backgroundColor:
-                                      AppColors.surface2.withOpacity(0.6),
-                                  valueColor:
-                                      AlwaysStoppedAnimation(accent),
-                                  minHeight: 3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
+      offset: const Offset(0, 6),
+      showWhenUnlinked: false,
+      child: Align(
+        alignment: Alignment.topRight,
+        child: MouseRegion(
+          onEnter: (_) => onEnter(),
+          onExit: (_) => onExit(),
+          child: const _DownloadDropdownContent(),
         ),
       ),
     );
   }
 }
+
+// ── Demo dropdown panel ───────────────────────────────────────────────────────
+
+class _DownloadDropdownContent extends StatelessWidget {
+  const _DownloadDropdownContent();
+
+  static const _demos = [
+    (title: 'Blinding Lights – The Weeknd', progress: 0.72, audio: false),
+    (title: 'Big Dawgs – Hanumankind [4K]', progress: 0.45, audio: false),
+    (title: 'Puthu Mazha – Audio', progress: 0.88, audio: true),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 224,
+        constraints: const BoxConstraints(maxHeight: 152),
+        decoration: BoxDecoration(
+          color: AppColors.surface1,
+          border: Border.all(color: AppColors.green.withOpacity(0.22)),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.42),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: _demos.map((item) {
+                final accent =
+                    item.audio ? const Color(0xFF3B82F6) : AppColors.green;
+                final pct = (item.progress * 100).toInt();
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            item.audio
+                                ? Icons.audiotrack_rounded
+                                : Icons.download_rounded,
+                            size: 11,
+                            color: accent,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.text,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '$pct%',
+                            style: AppTextStyles.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: accent,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LinearProgressIndicator(
+                          value: item.progress,
+                          backgroundColor:
+                              AppColors.surface2.withOpacity(0.5),
+                          valueColor: AlwaysStoppedAnimation(accent),
+                          minHeight: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+
+

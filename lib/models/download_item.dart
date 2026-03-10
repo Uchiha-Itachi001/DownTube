@@ -112,6 +112,7 @@ class DownloadItem {
         'file_path': filePath,
         'file_size': fileSize,
         'video_duration': videoDuration,
+        'error_message': errorMessage,
       };
 
   factory DownloadItem.fromDbMap(Map<String, dynamic> row) => DownloadItem(
@@ -123,7 +124,12 @@ class DownloadItem {
         outputPath: row['output_path'] as String? ?? '',
         thumbnailUrl: row['thumbnail_url'] as String?,
         extractor: row['extractor'] as String?,
-        status: DownloadStatus.done,
+        // Restore actual status — error items have no output file so we never
+        // want to auto-clean them; they're only removed by explicit delete.
+        status: DownloadStatus.values.firstWhere(
+          (s) => s.name == (row['status'] as String? ?? 'done'),
+          orElse: () => DownloadStatus.done,
+        ),
         phase: DownloadPhase.complete,
         downloadIndex: (row['download_index'] as int?) ?? 0,
         showInHistory: ((row['show_in_history'] as int?) ?? 1) != 0,
@@ -131,6 +137,7 @@ class DownloadItem {
         filePath: row['file_path'] as String? ?? '',
         fileSize: row['file_size'] as String?,
         videoDuration: row['video_duration'] as int?,
+        errorMessage: row['error_message'] as String?,
         createdAt: DateTime.fromMillisecondsSinceEpoch(
             (row['created_at'] as int?) ?? DateTime.now().millisecondsSinceEpoch),
       );

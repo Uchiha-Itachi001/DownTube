@@ -1,3 +1,8 @@
+// sidebar.dart — overflow-proof rewrite.
+// OverflowBox + SizedBox(width: width) inside AnimatedContainer ensures content
+// always lays out at the TARGET width. clipBehavior: Clip.hardEdge silently
+// clips the visual output during the animation. This eliminates all
+// RenderFlex overflow errors when the window is maximised/resized.
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
@@ -28,15 +33,24 @@ class Sidebar extends StatelessWidget {
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
       width: width,
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: AppColors.surface1,
         border: Border.all(color: AppColors.green.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppColors.radius),
-        child: Stack(
-          children: [
+      // OverflowBox lets the child lay out at the full target width even while
+      // AnimatedContainer is mid-animation at a narrower intermediate width.
+      child: OverflowBox(
+        minWidth: 0,
+        maxWidth: width,
+        alignment: Alignment.topLeft,
+        child: SizedBox(
+          width: width,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppColors.radius),
+            child: Stack(
+              children: [
             // Subtle green glow at bottom
             Positioned(
               bottom: -80,
@@ -149,7 +163,7 @@ class Sidebar extends StatelessWidget {
                   ),
                   if (!collapsed) ...[
                     const SizedBox(height: 8),
-                    _buildStorageBox(),
+                    const _StorageBox(),
                   ],
                 ],
               ),
@@ -157,58 +171,82 @@ class Sidebar extends StatelessWidget {
           ],
         ),
       ),
+        ),
+      ),
     );
   }
+}
 
-  Widget _buildStorageBox() {
-    final totalBytes = AppState.instance.totalStorageBytes;
-    final label = AppState.formatBytes(totalBytes);
-    // Show count of completed downloads
-    final count = AppState.instance.downloads
-        .where((d) => d.status == DownloadStatus.done)
-        .length;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+// ── Storage box (own widget so it rebuilds on AppState changes) ───────────────
+
+class _StorageBox extends StatelessWidget {
+  const _StorageBox();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppState.instance,
+      builder: (_, __) {
+        final totalBytes = AppState.instance.totalStorageBytes;
+        final label = AppState.formatBytes(totalBytes);
+        final count = AppState.instance.downloads
+            .where((d) => d.status == DownloadStatus.done)
+            .length;
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Storage',
-                  style: AppTextStyles.outfit(
-                      fontSize: 12, fontWeight: FontWeight.w600)),
-              Text('$count files',
-                  style: AppTextStyles.outfit(
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Storage',
+                      style: AppTextStyles.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    '$count files',
+                    style: AppTextStyles.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.green)),
+                      color: AppColors.green,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.storage_rounded,
+                      size: 12, color: AppColors.muted),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '$label used',
+                      style: AppTextStyles.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.storage_rounded, size: 12, color: AppColors.muted),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: AppTextStyles.outfit(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.text),
-              ),
-              Text(
-                ' used',
-                style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted),
-              ),
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -326,6 +364,7 @@ class _NavItemState extends State<_NavItem> {
           onTap: widget.onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
+            clipBehavior: Clip.hardEdge,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
             decoration: BoxDecoration(
               color: bg,

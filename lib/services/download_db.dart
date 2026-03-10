@@ -12,7 +12,7 @@ import '../models/download_item.dart';
 /// • Uses [sqflite_common_ffi] so it works on Windows / Linux desktop.
 class DownloadDb {
   static const _dbName = 'downtube_history.db';
-  static const _version = 5;
+  static const _version = 6;
   static Database? _db;
 
   static Future<Database> get _database async {
@@ -45,7 +45,8 @@ class DownloadDb {
             show_in_library INTEGER NOT NULL DEFAULT 1,
             file_path       TEXT NOT NULL DEFAULT '',
             file_size       TEXT,
-            video_duration  INTEGER
+            video_duration  INTEGER,
+            error_message   TEXT
           )
         '''),
         onUpgrade: (db, oldVer, newVer) async {
@@ -70,6 +71,9 @@ class DownloadDb {
           if (oldVer < 5) {
             await db.execute('ALTER TABLE downloads ADD COLUMN file_size TEXT');
             await db.execute('ALTER TABLE downloads ADD COLUMN video_duration INTEGER');
+          }
+          if (oldVer < 6) {
+            await db.execute('ALTER TABLE downloads ADD COLUMN error_message TEXT');
           }
         },
       ),
@@ -111,33 +115,36 @@ class DownloadDb {
   }
 
   /// Remove records whose output files no longer exist on disk.
+  /// Only removes a record when the file's parent directory is also gone,
+  /// to avoid incorrectly deleting records when yt-dlp changed the file
+  /// extension / filename after merging or audio conversion.
   static Future<int> cleanMissing() async {
     final db = await _database;
     final rows = await db.query('downloads', orderBy: 'created_at DESC');
     int removed = 0;
     for (final row in rows) {
       final item = DownloadItem.fromDbMap(row);
+      // Error items have no output file — they are never auto-cleaned.
+      // The user must delete them explicitly via the UI.
+      if (item.status == DownloadStatus.error) continue;
       final bool exists;
       if (item.filePath.isNotEmpty) {
-        // Check exact path first
         if (File(item.filePath).existsSync()) {
+          // Exact file found — keep.
           exists = true;
         } else {
-          // yt-dlp may have changed the extension during merge/conversion.
-          // Look for any file with the same base name in the same directory.
-          final dir = Directory(p.dirname(item.filePath));
-          final baseName = p.basenameWithoutExtension(item.filePath);
-          if (dir.existsSync()) {
-            exists = dir.listSync().whereType<File>().any(
-              (f) => p.basenameWithoutExtension(f.path) == baseName,
-            );
-          } else {
-            exists = false;
-          }
+          // File missing — only remove if the parent directory is also gone.
+          // yt-dlp often stores the temp stream file (e.g. video.f303.webm)
+          // as filePath; that file is deleted after merging but the directory
+          // and the final merged file are still present.
+          final parentDir = Directory(p.dirname(item.filePath));
+          exists = parentDir.existsSync();
         }
+      } else if (item.outputPath.isNotEmpty) {
+        // No filePath stored — verify the output directory still exists.
+        exists = Directory(item.outputPath).existsSync();
       } else {
-        // No filePath stored (legacy record) — we can't verify file existence,
-        // so keep the record to avoid wrongly deleting valid entries.
+        // No path info at all — keep the record.
         exists = true;
       }
       if (!exists) {

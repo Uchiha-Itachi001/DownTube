@@ -326,12 +326,21 @@ class _LogoBox extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: width,
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: AppColors.surface1,
         border: Border.all(color: AppColors.green.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
-      child: Padding(
+      // OverflowBox + SizedBox(width: width) — same pattern as Sidebar —
+      // prevents RenderFlex overflow during the expand/collapse animation.
+      child: OverflowBox(
+        minWidth: 0,
+        maxWidth: width,
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          width: width,
+          child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child:
             collapsed
@@ -406,6 +415,8 @@ class _LogoBox extends StatelessWidget {
                     ),
                   ],
                 ),
+          ),
+        ),
       ),
     );
   }
