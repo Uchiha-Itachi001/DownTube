@@ -263,24 +263,26 @@ class _FeaturePillState extends State<_FeaturePill> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
         decoration: BoxDecoration(
-          color: _hovered ? AppColors.accentDim : AppColors.surface2,
+          color: _hovered
+              ? AppColors.accent.withOpacity(0.20)
+              : AppColors.accentDim,
           border: Border.all(
             color: _hovered
-                ? AppColors.accent.withOpacity(0.35)
-                : AppColors.border,
+                ? AppColors.accent.withOpacity(0.55)
+                : AppColors.accent.withOpacity(0.30),
           ),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(widget.icon, size: 14, color: _hovered ? AppColors.accent : AppColors.muted),
+            Icon(widget.icon, size: 14, color: AppColors.accent),
             const SizedBox(width: 6),
             Text(
               widget.label,
               style: AppTextStyles.outfit(
                 fontSize: 12,
-                color: _hovered ? AppColors.accent : AppColors.muted,
+                color: AppColors.accent,
               ),
             ),
           ],

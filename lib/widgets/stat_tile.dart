@@ -19,8 +19,8 @@ class StatTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.18)),
         borderRadius: BorderRadius.circular(11),
       ),
       child: Column(

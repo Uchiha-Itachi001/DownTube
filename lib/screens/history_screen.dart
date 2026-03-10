@@ -1,4 +1,5 @@
 ﻿import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
@@ -6,7 +7,6 @@ import '../models/download_item.dart';
 import '../providers/app_state.dart';
 import '../widgets/section_card.dart';
 import '../widgets/stat_tile.dart';
-import '../widgets/sparkline_chart.dart';
 import '../widgets/app_notification.dart';
 
 enum _HistoryDateFilter { today, week, all }
@@ -347,26 +347,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Widget _buildWeeklyChart() {
     final now = DateTime.now();
-    // Count downloads per day for the last 7 days (Mon..Sun relative to today)
+    // Count completed downloads per day for the last 7 days
     final counts = List<double>.filled(7, 0);
     for (final d in AppState.instance.downloads) {
-      final diff = now.difference(d.createdAt).inDays;
-      if (diff >= 0 && diff < 7) {
-        counts[6 - diff] += 1;
-      }
+      if (d.status != DownloadStatus.done && d.status != DownloadStatus.error) continue;
+      final diff = DateTime(now.year, now.month, now.day)
+          .difference(DateTime(d.createdAt.year, d.createdAt.month, d.createdAt.day))
+          .inDays;
+      if (diff >= 0 && diff < 7) counts[6 - diff] += 1;
     }
-    // Day labels starting from 6 days ago up to today
+    // Day labels: 6 days ago → today
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final labels = List.generate(7, (i) {
       final day = now.subtract(Duration(days: 6 - i));
-      const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return names[day.weekday - 1];
+      return dayNames[day.weekday - 1];
     });
+    final maxCount = counts.fold(0.0, (a, b) => math.max(a, b));
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: Column(
@@ -382,15 +384,74 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          SparklineChart(values: counts, height: 70),
-          const SizedBox(height: 10),
+          // Proportional bar chart
+          SizedBox(
+            height: 70,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(7, (i) {
+                final isToday  = i == 6;
+                final norm     = maxCount > 0 ? counts[i] / maxCount : 0.0;
+                final barH     = math.max(4.0, 64.0 * norm);
+                final hasDownloads = counts[i] > 0;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOut,
+                      height: barH,
+                      decoration: BoxDecoration(
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(4)),
+                        color: isToday
+                            ? AppColors.accent
+                            : AppColors.accent.withOpacity(0.35),
+                        boxShadow: isToday && hasDownloads
+                            ? [BoxShadow(
+                                color: AppColors.accentGlow,
+                                blurRadius: 10,
+                              )]
+                            : null,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: labels
-                .map((d) => Text(d,
-                    style: AppTextStyles.outfit(
-                        fontSize: 10, color: AppColors.muted2)))
-                .toList(),
+            children: List.generate(7, (i) {
+              final isToday = i == 6;
+              final count   = counts[i].toInt();
+              return Expanded(
+                child: Column(
+                  children: [
+                    if (count > 0)
+                      Text(
+                        '$count',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.outfit(
+                          fontSize: 9,
+                          color: isToday ? AppColors.accent : AppColors.muted2,
+                        ),
+                      )
+                    else
+                      const SizedBox(height: 12),
+                    Text(
+                      labels[i],
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.outfit(
+                        fontSize: 10,
+                        color: isToday ? AppColors.accent : AppColors.muted2,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ),
         ],
       ),

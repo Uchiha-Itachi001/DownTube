@@ -222,18 +222,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     minHeight: 0,
                   ),
                   filled: true,
-                  fillColor: AppColors.surface2,
+                  fillColor: AppColors.surfaceTransparent,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 8,
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(9),
-                    borderSide: const BorderSide(color: AppColors.border),
+                    borderSide: BorderSide(color: AppColors.accent.withValues(alpha: 0.20)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(9),
-                    borderSide: const BorderSide(color: AppColors.border),
+                    borderSide: BorderSide(color: AppColors.accent.withValues(alpha: 0.20)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(9),
@@ -262,12 +262,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: isActive ? AppColors.accent : AppColors.surface2,
+                      color: isActive ? AppColors.accent : AppColors.surfaceTransparent,
                       border: Border.all(
                         color:
                             isActive
                                 ? AppColors.accent.withValues(alpha: 0.4)
-                                : AppColors.border,
+                                : AppColors.accent.withValues(alpha: 0.20),
                       ),
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -296,11 +296,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 decoration: BoxDecoration(
                   color: _selectedDate != null
                       ? AppColors.accent.withOpacity(0.12)
-                      : AppColors.surface2,
+                      : AppColors.surfaceTransparent,
                   border: Border.all(
                     color: _selectedDate != null
                         ? AppColors.accent.withOpacity(0.4)
-                        : AppColors.border,
+                        : AppColors.accent.withOpacity(0.20),
                   ),
                   borderRadius: BorderRadius.circular(8),
                 ),

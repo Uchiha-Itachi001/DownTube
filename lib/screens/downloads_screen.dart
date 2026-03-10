@@ -229,10 +229,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.surface2,
-                border: Border.all(color: AppColors.border, width: 1),
+                color: AppColors.accentDim,
+                border: Border.all(color: AppColors.accent.withOpacity(0.30), width: 1),
               ),
-              child: Icon(icon, size: 24, color: AppColors.muted2),
+              child: Icon(icon, size: 24, color: AppColors.accent.withOpacity(0.70)),
             ),
             const SizedBox(height: 14),
             Text(
@@ -305,8 +305,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: Column(
@@ -370,7 +370,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
           SparklineChart(
             values:
                 active.isNotEmpty && active.first.speedHistory.isNotEmpty
-                    ? active.first.speedHistory
+                    ? List.of(active.first.speedHistory)
                     : const [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             height: 50,
           ),
@@ -383,8 +383,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: Column(
