@@ -90,64 +90,33 @@ class DownloadDb {
     );
   }
 
-  /// Load all saved records. Deduplicates by URL (keeps most recent per URL).
-  /// Does NOT remove records with missing files — use [cleanMissing] for that.
+  /// Load all saved records. No automatic deduplication — every record is kept.
   static Future<List<DownloadItem>> loadAndClean() async {
     final db = await _database;
     final rows = await db.query('downloads', orderBy: 'created_at DESC');
-
-    final items = rows.map((row) => DownloadItem.fromDbMap(row)).toList();
-
-    // Deduplicate: keep only the most recent record per URL
-    final seenUrls = <String>{};
-    final deduped = <DownloadItem>[];
-    for (final item in items) {
-      final key = item.url.isNotEmpty ? item.url : item.id;
-      if (seenUrls.add(key)) {
-        deduped.add(item);
-      } else {
-        // Older duplicate — remove from DB
-        await db.delete('downloads', where: 'id = ?', whereArgs: [item.id]);
-      }
-    }
-
-    return deduped;
+    return rows.map((row) => DownloadItem.fromDbMap(row)).toList();
   }
 
   /// Remove records whose output files no longer exist on disk.
-  /// Only removes a record when the file's parent directory is also gone,
-  /// to avoid incorrectly deleting records when yt-dlp changed the file
-  /// extension / filename after merging or audio conversion.
+  /// Only checks successfully downloaded items (status == done).
+  /// Error/cancelled items are never auto-cleaned.
   static Future<int> cleanMissing() async {
     final db = await _database;
     final rows = await db.query('downloads', orderBy: 'created_at DESC');
     int removed = 0;
     for (final row in rows) {
       final item = DownloadItem.fromDbMap(row);
-      // Error items have no output file — they are never auto-cleaned.
-      // The user must delete them explicitly via the UI.
-      if (item.status == DownloadStatus.error) continue;
-      final bool exists;
-      if (item.filePath.isNotEmpty) {
-        if (File(item.filePath).existsSync()) {
-          // Exact file found — keep.
-          exists = true;
-        } else {
-          // File missing — only remove if the parent directory is also gone.
-          // yt-dlp often stores the temp stream file (e.g. video.f303.webm)
-          // as filePath; that file is deleted after merging but the directory
-          // and the final merged file are still present.
-          final parentDir = Directory(p.dirname(item.filePath));
-          exists = parentDir.existsSync();
-        }
-      } else if (item.outputPath.isNotEmpty) {
-        // No filePath stored — verify the output directory still exists.
-        exists = Directory(item.outputPath).existsSync();
-      } else {
-        // No path info at all — keep the record.
-        exists = true;
-      }
-      if (!exists) {
+      // Only clean successfully downloaded items
+      if (item.status != DownloadStatus.done) continue;
+      // Only check records that have a real file path (not empty, not a template)
+      if (item.filePath.isEmpty) continue;
+      if (item.filePath.contains('%(')) continue; // unexpanded yt-dlp template
+      // Safety: only remove if the parent directory exists but the file doesn't.
+      // If the whole directory is gone (e.g. drive unmounted), keep the record.
+      final file = File(item.filePath);
+      final parentDir = file.parent;
+      if (!parentDir.existsSync()) continue; // directory missing — keep record
+      if (!file.existsSync()) {
         await db.delete('downloads', where: 'id = ?', whereArgs: [item.id]);
         removed++;
       }

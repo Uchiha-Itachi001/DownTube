@@ -30,6 +30,7 @@ class SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Title row
           Row(
             children: [
               Text(title, style: AppTextStyles.sectionTitle),
@@ -52,10 +53,17 @@ class SectionCard extends StatelessWidget {
                   ),
                 ),
               ],
-              const Spacer(),
-              if (actions != null) ...actions!,
             ],
           ),
+          // Actions row (wrapping)
+          if (actions != null) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: actions!,
+            ),
+          ],
           const SizedBox(height: 16),
           if (expand) Expanded(child: child) else child,
         ],
@@ -98,11 +106,13 @@ class _SectionActionState extends State<SectionAction> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           decoration: BoxDecoration(
-            color: AppColors.surface2,
+            color: _hovered
+                ? (widget.color ?? AppColors.accent).withOpacity(0.10)
+                : Colors.transparent,
             border: Border.all(
-              color: widget.color != null
-                  ? widget.color!.withOpacity(0.2)
-                  : AppColors.border,
+              color: _hovered
+                  ? (widget.color ?? AppColors.accent).withOpacity(0.40)
+                  : AppColors.accent.withOpacity(0.25),
             ),
             borderRadius: BorderRadius.circular(8),
           ),

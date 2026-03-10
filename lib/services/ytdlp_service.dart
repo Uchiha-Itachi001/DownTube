@@ -5,6 +5,7 @@ import 'dart:convert';
 class YtDlpService {
   String? _execPath;
   final Map<String, Process> _activeDownloads = {};
+  Process? _playlistStreamProcess;
 
   String? get execPath => _execPath;
 
@@ -105,6 +106,82 @@ class YtDlpService {
 
     final errText = utf8.decode(stderr, allowMalformed: true).trim();
     throw Exception(_friendlyYtDlpError(errText, exitCode));
+  }
+
+  /// Quick info: fetches only first playlist item to detect type fast (1-3 sec).
+  /// For single videos returns the full video JSON.
+  /// For playlists returns the playlist envelope with 1 entry + metadata fields.
+  Future<Map<String, dynamic>?> fetchQuickInfo(String url) async {
+    if (_execPath == null) return null;
+
+    final process = await Process.start(
+      _execPath!,
+      [
+        '--flat-playlist', '--playlist-items', '1', '-J',
+        '--no-warnings', '--remote-components', 'ejs:github', url,
+      ],
+      runInShell: false,
+    );
+
+    final stdout = <int>[];
+    final stderr = <int>[];
+    process.stdout.listen(stdout.addAll);
+    process.stderr.listen(stderr.addAll);
+
+    final exitCode = await process.exitCode.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        process.kill();
+        return -1;
+      },
+    );
+
+    if (exitCode == 0) {
+      final output = utf8.decode(stdout).trim();
+      if (output.isNotEmpty) {
+        try {
+          return json.decode(output) as Map<String, dynamic>;
+        } catch (_) {}
+      }
+    }
+
+    final errText = utf8.decode(stderr, allowMalformed: true).trim();
+    throw Exception(_friendlyYtDlpError(errText, exitCode));
+  }
+
+  /// Streams all flat playlist entries one-by-one as yt-dlp discovers them.
+  /// Each emitted map is a single playlist entry JSON (with playlist metadata fields).
+  Stream<Map<String, dynamic>> streamFlatPlaylist(String url) async* {
+    if (_execPath == null) return;
+
+    final process = await Process.start(
+      _execPath!,
+      [
+        '--flat-playlist', '-j',
+        '--no-warnings', '--remote-components', 'ejs:github', url,
+      ],
+      runInShell: false,
+    );
+    _playlistStreamProcess = process;
+
+    try {
+      await for (final line in process.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())) {
+        if (line.trim().isEmpty) continue;
+        try {
+          yield json.decode(line) as Map<String, dynamic>;
+        } catch (_) {}
+      }
+    } finally {
+      _playlistStreamProcess = null;
+    }
+  }
+
+  /// Kill any in-progress playlist stream (called on resetFetch).
+  void killPlaylistStream() {
+    _playlistStreamProcess?.kill();
+    _playlistStreamProcess = null;
   }
 
   Stream<String> startDownload({

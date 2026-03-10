@@ -9,6 +9,7 @@ import '../models/video_info.dart';
 import '../providers/app_state.dart';
 import '../widgets/app_notification.dart';
 import '../widgets/shimmer_box.dart';
+import 'playlist_analyzed_screen.dart';
 
 // Quality option
 class _QOption {
@@ -137,9 +138,9 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         showAppNotification(
           context,
           type: NotificationType.loading,
-          message: 'Fetching video info…',
+          message: 'Fetching info…',
           subtitle: widget.initialUrl,
-          duration: const Duration(seconds: 30),
+          duration: const Duration(seconds: 120), // long enough for large playlist streams
           dismissController: dismissNotifier,
         );
       });
@@ -149,20 +150,22 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   void _onStateChange() {
     if (!mounted) return;
     final state = AppState.instance.fetchState;
-    // Only reset quality/tab/format when state *transitions* to success —
-    // not on every notifyListeners() call (e.g. download progress updates).
+    // Only reset quality/tab/format on success transition for single videos
     if (state == FetchState.success &&
         _lastNotifiedFetchState != FetchState.success) {
-      setState(() {
-        _selectedQuality = 0;
-        _selectedTab = 0;
-        _selectedFormat = 'MP4';
-      });
+      if (!AppState.instance.isPlaylist) {
+        setState(() {
+          _selectedQuality = 0;
+          _selectedTab = 0;
+          _selectedFormat = 'MP4';
+        });
+      } else {
+        setState(() {});
+      }
     } else {
       setState(() {});
     }
-    // Only fire a notification when the state *transitions* — not on every
-    // notifyListeners() call that happens while state is unchanged.
+    // Fire notifications only on state *transitions*
     if (state == FetchState.success &&
         _lastNotifiedFetchState != FetchState.success) {
       _lastNotifiedFetchState = FetchState.success;
@@ -170,13 +173,23 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
       _loadingNotifDismiss = null;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        showAppNotification(
-          context,
-          type: NotificationType.success,
-          message: 'Video ready!',
-          subtitle: AppState.instance.videoInfo?.title,
-          duration: const Duration(seconds: 3),
-        );
+        if (AppState.instance.isPlaylist) {
+          showAppNotification(
+            context,
+            type: NotificationType.success,
+            message: 'Playlist ready!',
+            subtitle: '${AppState.instance.playlistInfo?.entries.length ?? 0} videos loaded',
+            duration: const Duration(seconds: 3),
+          );
+        } else {
+          showAppNotification(
+            context,
+            type: NotificationType.success,
+            message: 'Video ready!',
+            subtitle: AppState.instance.videoInfo?.title,
+            duration: const Duration(seconds: 3),
+          );
+        }
       });
     } else if (state == FetchState.error &&
         _lastNotifiedFetchState != FetchState.error) {
@@ -248,6 +261,17 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Playlist detected — delegate to playlist UI (embedded, same screen lifecycle)
+    if (AppState.instance.isPlaylist) {
+      return PlaylistAnalyzedScreen(
+        key: const Key('playlist_analyzed_inner'),
+        url: widget.initialUrl ?? AppState.instance.currentUrl ?? '',
+        onDownloadAll: widget.onDownload,
+        onQueueAll: widget.onQueue,
+        onDownloadOne: widget.onDownload,
+        onError: null, // AnalyzedScreen._onStateChange handles error routing
+      );
+    }
     if (_isLikelyVertical) {
       return _buildVerticalLayout();
     }
@@ -730,74 +754,56 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
         .replaceFirst('http://', '');
     final path = _outputPath ?? AppState.instance.downloadPath ?? '';
     final displayPath = path.isEmpty ? 'Default folder' : path;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // URL copy bar — full width
-        GestureDetector(
-          onTap: () => Clipboard.setData(ClipboardData(text: url)),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.link_rounded,
-                  size: 12,
-                  color: AppColors.muted,
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    display.isEmpty ? '—' : display,
-                    style: AppTextStyles.outfit(
-                      fontSize: 11,
-                      color: AppColors.muted,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Icon(
-                  Icons.copy_rounded,
-                  size: 12,
-                  color: AppColors.muted,
-                ),
-              ],
-            ),
-          ),
+
+    final urlBar = GestureDetector(
+      onTap: () => Clipboard.setData(ClipboardData(text: url)),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: AppColors.border),
         ),
-        const SizedBox(height: 6),
-        // Folder picker — full width
-        GestureDetector(
-          onTap: _pickOutputFolder,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(7),
-                border: Border.all(color: AppColors.border),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.link_rounded, size: 12, color: AppColors.muted),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                display.isEmpty ? '—' : display,
+                style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.folder_outlined,
-                    size: 12,
-                    color: AppColors.accent,
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      displayPath,
-                      style: AppTextStyles.mono(
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.copy_rounded, size: 12, color: AppColors.muted),
+          ],
+        ),
+      ),
+    );
+
+    final pathBar = GestureDetector(
+      onTap: _pickOutputFolder,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.folder_outlined, size: 12, color: AppColors.accent),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  displayPath,
+                  style: AppTextStyles.mono(
                         fontSize: 10,
                         color: AppColors.muted,
                       ),
@@ -831,6 +837,21 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
               ),
             ),
           ),
+        );
+ 
+
+    // Wrap places URL and path side-by-side when room allows, stacks vertically otherwise
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 180, maxWidth: 400),
+          child: urlBar,
+        ),
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 180, maxWidth: 400),
+          child: pathBar,
         ),
       ],
     );

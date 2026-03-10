@@ -5,6 +5,7 @@ import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import '../models/download_item.dart';
 import '../providers/app_state.dart';
+import '../widgets/app_notification.dart';
 import '../widgets/toggle_switch.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -1024,8 +1025,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: 'Reset All Settings',
                 message:
                     'This will reset all preferences to default values. This action cannot be undone.',
-                onConfirm: () {
+                onConfirm: () async {
                   Navigator.of(context).pop();
+                  await AppState.instance.resetAllSettings();
+                  if (context.mounted) {
+                    showAppNotification(
+                      context,
+                      type: NotificationType.success,
+                      message: 'Settings reset to defaults',
+                      duration: const Duration(seconds: 3),
+                    );
+                  }
                 },
               );
             },
@@ -1038,8 +1048,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               message:
                   'This will permanently remove all download records from the database. Downloaded files on disk will not be deleted.',
               onConfirm: () async {
+                Navigator.of(context).pop();
                 await AppState.instance.clearHistory();
-                if (mounted) Navigator.of(context).pop();
+                if (context.mounted) {
+                  showAppNotification(
+                    context,
+                    type: NotificationType.success,
+                    message: 'Download history cleared',
+                    duration: const Duration(seconds: 3),
+                  );
+                }
               },
             );
           }),
@@ -1050,22 +1068,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               message:
                   'This will remove download records for files that no longer exist on disk. Active downloads will not be affected.',
               onConfirm: () async {
+                Navigator.of(context).pop();
                 final removed =
                     await AppState.instance.cleanMissingFiles();
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        removed > 0
-                            ? 'Removed $removed stale record${removed > 1 ? "s" : ""}'
-                            : 'No stale records found',
-                        style: const TextStyle(fontFamily: 'Outfit'),
-                      ),
-                      backgroundColor: AppColors.surface2,
-                      behavior: SnackBarBehavior.floating,
-                      duration: const Duration(seconds: 3),
-                    ),
+                if (context.mounted) {
+                  showAppNotification(
+                    context,
+                    type: NotificationType.success,
+                    message: removed > 0
+                        ? 'Removed $removed stale record${removed > 1 ? "s" : ""}'
+                        : 'No stale records found',
+                    duration: const Duration(seconds: 3),
                   );
                 }
               },

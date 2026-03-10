@@ -129,13 +129,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
             height: 60,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.surface2,
-              border: Border.all(color: AppColors.border),
+              color: AppColors.accentDim,
+              border: Border.all(color: AppColors.accent.withOpacity(0.30)),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.video_library_outlined,
               size: 26,
-              color: AppColors.muted2,
+              color: AppColors.accent.withOpacity(0.70),
             ),
           ),
           const SizedBox(height: 14),
@@ -165,7 +165,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: Row(
@@ -453,7 +453,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
               const SizedBox(height: 14),
               Text(
-                'Delete "${item.title}"?\n\nThis will remove it from your library.But the file on disk is not affected',
+                'Delete "${item.title}"?\n\nThis will remove it from your library and permanently delete the file from your device.',
                 style: AppTextStyles.outfit(
                     fontSize: 13, color: AppColors.muted, height: 1.5),
               ),

@@ -243,15 +243,17 @@ class _AppShellState extends State<AppShell>
                                     ? KeyedSubtree(
                                         key: ValueKey('analyze-$_pendingUrl-$_fetchKey'),
                                         child: AnalyzedScreen(
-                                          key: ValueKey('$_pendingUrl-$_fetchKey'),
-                                          initialUrl: _pendingUrl,
-                                          onDownload: () => _onNavSelected(2),
-                                          onQueue: () => _onNavSelected(0),                                          onError: () {
-                                            setState(() {
-                                              _selectedIndex = 0;
-                                              _pendingUrl = null;
-                                            });
-                                          },                                        ),
+                                            key: ValueKey('$_pendingUrl-$_fetchKey'),
+                                            initialUrl: _pendingUrl,
+                                            onDownload: () => _onNavSelected(2),
+                                            onQueue: () => _onNavSelected(0),
+                                            onError: () {
+                                              setState(() {
+                                                _selectedIndex = 0;
+                                                _pendingUrl = null;
+                                              });
+                                            },
+                                          ),
                                       )
                                     : KeyedSubtree(
                                         key: ValueKey(

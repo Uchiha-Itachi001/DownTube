@@ -35,6 +35,9 @@ class DownloadItem {
   String? fileSize;
   /// Video duration in seconds from VideoInfo (set at enqueue time).
   int? videoDuration;
+  /// Transient: tracks the current partial download path for cleanup on cancel.
+  /// Not persisted to DB.
+  String partialPath = '';
 
   /// Parse [fileSize] string to bytes. Returns 0 if unavailable.
   int get fileSizeBytes {

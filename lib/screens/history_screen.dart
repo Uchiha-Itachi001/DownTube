@@ -158,7 +158,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: Column(
@@ -233,7 +233,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface1,
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
       ),
       child: history.isEmpty
@@ -282,13 +282,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
               width: 60,
               height: 60,
               decoration: BoxDecoration(
-                color: AppColors.surface2,
+                color: AppColors.accentDim,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: AppColors.accent.withOpacity(0.30)),
               ),
-              child: const Center(
+              child: Center(
                 child: Icon(Icons.history_rounded,
-                    size: 26, color: AppColors.muted2),
+                    size: 26, color: AppColors.accent.withOpacity(0.70)),
               ),
             ),
             const SizedBox(height: 14),
@@ -518,11 +518,11 @@ class _FilterPill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.accent : AppColors.surface2,
+            color: isActive ? AppColors.accent.withOpacity(0.14) : Colors.transparent,
             border: Border.all(
               color: isActive
                   ? AppColors.accent.withOpacity(0.4)
-                  : AppColors.border,
+                  : AppColors.accent.withOpacity(0.20),
             ),
             borderRadius: BorderRadius.circular(7),
           ),
@@ -531,7 +531,7 @@ class _FilterPill extends StatelessWidget {
             style: AppTextStyles.outfit(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: isActive ? Colors.black : AppColors.muted,
+              color: isActive ? AppColors.accent : AppColors.muted,
             ),
           ),
         ),
@@ -573,11 +573,11 @@ class _DatePickerBtn extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isActive
                     ? AppColors.accent.withOpacity(0.12)
-                    : AppColors.surface2,
+                    : Colors.transparent,
                 border: Border.all(
                   color: isActive
                       ? AppColors.accent.withOpacity(0.4)
-                      : AppColors.border,
+                      : AppColors.accent.withOpacity(0.20),
                 ),
                 borderRadius: BorderRadius.circular(7),
               ),
@@ -611,8 +611,8 @@ class _DatePickerBtn extends StatelessWidget {
                 width: 20,
                 height: 20,
                 decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  border: Border.all(color: AppColors.border),
+                  color: Colors.transparent,
+                  border: Border.all(color: AppColors.accent.withOpacity(0.25)),
                   borderRadius: BorderRadius.circular(5),
                 ),
                 child: const Icon(Icons.close_rounded,
@@ -679,7 +679,7 @@ class _ClearAllButtonState extends State<_ClearAllButton> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Remove all completed and failed downloads from history?\n\nFiles on disk are NOT deleted.',
+                'Remove all completed and failed downloads from history?\n\nThis will permanently delete all downloaded files from your device.',
                 style: AppTextStyles.outfit(fontSize: 13, color: AppColors.muted, height: 1.5),
               ),
               const SizedBox(height: 24),
@@ -714,6 +714,14 @@ class _ClearAllButtonState extends State<_ClearAllButton> {
     );
     if (ok == true) {
       await AppState.instance.clearHistory();
+      if (context.mounted) {
+        showAppNotification(
+          context,
+          type: NotificationType.success,
+          message: 'Download history cleared',
+          duration: const Duration(seconds: 3),
+        );
+      }
     }
   }
 
@@ -731,11 +739,11 @@ class _ClearAllButtonState extends State<_ClearAllButton> {
           decoration: BoxDecoration(
             color: widget.hasHistory && _hovered
                 ? AppColors.red.withOpacity(0.12)
-                : AppColors.surface2,
+                : Colors.transparent,
             border: Border.all(
               color: widget.hasHistory && _hovered
                   ? AppColors.red.withOpacity(0.4)
-                  : AppColors.border,
+                  : AppColors.accent.withOpacity(0.20),
             ),
             borderRadius: BorderRadius.circular(8),
           ),

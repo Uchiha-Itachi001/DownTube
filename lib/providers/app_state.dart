@@ -3,11 +3,15 @@ import 'dart:io';
 import '../core/app_colors.dart';
 import '../models/video_info.dart';
 import '../models/download_item.dart';
+import '../models/playlist_info.dart';
+import '../models/playlist_entry.dart';
 import '../services/prefs_service.dart';
 import '../services/ytdlp_service.dart';
 import '../services/download_db.dart';
 
 enum FetchState { idle, loading, success, error }
+
+enum PlaylistFetchState { idle, loadingEntries, success, error }
 
 // Phase notifications (consumed by UI to show overlay cards)
 enum DownloadNotifType { videoPhase, audioPhase, mergeDone }
@@ -83,14 +87,56 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Resets every preference to its factory default.
+  Future<void> resetAllSettings() async {
+    await setThemeColor(AppColors.green);
+    await _prefs?.clearDownloadPath();
+    downloadPath = null;
+    autoDownload = true;
+    embedSubs = true;
+    saveThumbnail = true;
+    addChapters = false;
+    autoUpdateYtDlp = true;
+    notificationsEnabled = true;
+    soundEffects = false;
+    defaultQuality = '1080p';
+    defaultFormat = 'MP4';
+    defaultAudioFormat = 'MP3';
+    audioBitrate = '320 kbps';
+    await Future.wait([
+      _prefs?.setAutoDownload(true) ?? Future.value(),
+      _prefs?.setEmbedSubs(true) ?? Future.value(),
+      _prefs?.setSaveThumbnail(true) ?? Future.value(),
+      _prefs?.setAddChapters(false) ?? Future.value(),
+      _prefs?.setAutoUpdateYtDlp(true) ?? Future.value(),
+      _prefs?.setNotifications(true) ?? Future.value(),
+      _prefs?.setSoundEffects(false) ?? Future.value(),
+      _prefs?.setDefaultQuality('1080p') ?? Future.value(),
+      _prefs?.setDefaultFormat('MP4') ?? Future.value(),
+      _prefs?.setDefaultAudioFormat('MP3') ?? Future.value(),
+      _prefs?.setAudioBitrate('320 kbps') ?? Future.value(),
+    ]);
+    notifyListeners();
+  }
+
   // Video fetch state
   FetchState fetchState = FetchState.idle;
   VideoInfo? videoInfo;
   String? fetchError;
   String? currentUrl;
 
+  // Playlist state
+  PlaylistFetchState playlistFetchState = PlaylistFetchState.idle;
+  PlaylistInfo? playlistInfo;
+  String? playlistError;
+  int playlistLoadingCount = 0;
+  bool get isPlaylist => playlistInfo != null;
+
   // Downloads
   final List<DownloadItem> downloads = [];
+  static const int maxConcurrentDownloads = 6;
+  int _activeDownloadCount = 0;
+  final List<DownloadItem> _downloadQueue = [];
 
   // Phase notifications (UI drains this queue after notifyListeners)
   final List<DownloadNotification> pendingNotifications = [];
@@ -184,41 +230,109 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     } catch (_) {}
   }
-  // Fetch video
+  // Fetch video (detects playlist vs single video) with progressive playlist loading
   Future<void> fetchVideo(String url) async {
     currentUrl = url;
     fetchState = FetchState.loading;
     videoInfo = null;
     fetchError = null;
+    playlistFetchState = PlaylistFetchState.idle;
+    playlistInfo = null;
+    playlistError = null;
+    playlistLoadingCount = 0;
     notifyListeners();
 
     try {
-      final json = await ytDlp.fetchMetadata(url);
+      // Quick fetch: --playlist-items 1 detects type in 1-3 seconds even for huge playlists
+      final json = await ytDlp.fetchQuickInfo(url);
       if (json == null) {
         throw Exception('yt-dlp engine not found. Install yt-dlp and restart the app.');
       }
-      videoInfo = VideoInfo.fromYtDlpJson(json);
-      fetchState = FetchState.success;
+
+      final type = json['_type']?.toString();
+      // Detect playlist: explicit _type, or presence of playlist metadata fields,
+      // or URL patterns that indicate a playlist context.
+      final looksLikePlaylist = type == 'playlist' ||
+          json.containsKey('playlist_count') ||
+          json.containsKey('entries') ||
+          (url.contains('list=') && json['playlist_title'] != null) ||
+          url.contains('/playlist?');
+      if (looksLikePlaylist) {
+        // Build initial playlist info from metadata (entries start empty)
+        playlistInfo = PlaylistInfo.fromFirstEntry(json);
+        playlistFetchState = PlaylistFetchState.loadingEntries;
+        // fetchState stays loading — entries are still streaming
+        notifyListeners(); // UI sees isPlaylist=true → switches to playlist layout immediately
+
+        // Stream remaining entries progressively
+        int loadedCount = 0;
+        await for (final entryJson in ytDlp.streamFlatPlaylist(url)) {
+          loadedCount++;
+          final entry = PlaylistEntry.fromJson(entryJson, loadedCount);
+          playlistInfo!.entries.add(entry);
+          playlistLoadingCount = loadedCount;
+          if (loadedCount % 5 == 0) notifyListeners();
+        }
+        playlistLoadingCount = loadedCount;
+        playlistFetchState = PlaylistFetchState.success;
+        fetchState = FetchState.success;
+      } else {
+        // Single video — use the JSON we already have
+        videoInfo = VideoInfo.fromYtDlpJson(json);
+        fetchState = FetchState.success;
+      }
     } catch (e) {
       fetchError = e.toString().replaceFirst('Exception: ', '');
       fetchState = FetchState.error;
+      playlistFetchState = PlaylistFetchState.error;
+      playlistError = fetchError;
     }
     notifyListeners();
   }
 
   void resetFetch() {
+    ytDlp.killPlaylistStream(); // abort any in-progress playlist stream
     fetchState = FetchState.idle;
     videoInfo = null;
     fetchError = null;
     currentUrl = null;
+    resetPlaylist();
     notifyListeners();
+  }
+
+  void resetPlaylist() {
+    playlistFetchState = PlaylistFetchState.idle;
+    playlistInfo = null;
+    playlistError = null;
+    playlistLoadingCount = 0;
   }
 
   // Downloads
   void enqueueDownload(DownloadItem item) {
     downloads.insert(0, item);
     notifyListeners();
+    if (_activeDownloadCount < maxConcurrentDownloads) {
+      _startDownload(item);
+    } else {
+      _downloadQueue.add(item);
+    }
+  }
+
+  void _startDownload(DownloadItem item) {
+    _activeDownloadCount++;
     _executeDownload(item);
+  }
+
+  void _onDownloadFinished() {
+    _activeDownloadCount--;
+    // Start the next queued download (FIFO)
+    while (_downloadQueue.isNotEmpty && _activeDownloadCount < maxConcurrentDownloads) {
+      final next = _downloadQueue.removeAt(0);
+      // Only start if still queued (user may have cancelled while waiting)
+      if (next.status == DownloadStatus.queued) {
+        _startDownload(next);
+      }
+    }
   }
 
   Future<void> _executeDownload(DownloadItem item) async {
@@ -285,6 +399,7 @@ class AppState extends ChangeNotifier {
           // Capture the first destination as likely-final for single-stream DLs
           if (destinationCount == 1) {
             _firstDest = line.substring(line.indexOf('Destination:') + 'Destination:'.length).trim();
+            item.partialPath = _firstDest!;
             // First file — video (or audio for audio-only)
             item.phase = audioOnly ? DownloadPhase.audio : DownloadPhase.video;
             item.progress = 0.0;
@@ -308,10 +423,12 @@ class AppState extends ChangeNotifier {
             final idx = line.indexOf('into ');
             if (idx != -1) {
               _mergeDest = line.substring(idx + 5).trim().replaceAll('"', '');
+              item.partialPath = _mergeDest!;
             }
           } else if (line.contains('Destination:')) {
             // audio-only: [ffmpeg] or [ExtractAudio] Destination: path
             _ffmpegDest = line.substring(line.indexOf('Destination:') + 'Destination:'.length).trim();
+            item.partialPath = _ffmpegDest!;
           }
           // Merging video+audio OR ffmpeg audio conversion
           item.phase = DownloadPhase.merging;
@@ -352,6 +469,7 @@ class AppState extends ChangeNotifier {
       }
       // If download was cancelled mid-way, don't overwrite the cancelled state
       if (item.status == DownloadStatus.error) {
+        _onDownloadFinished();
         notifyListeners();
         return;
       }
@@ -394,8 +512,18 @@ class AppState extends ChangeNotifier {
       // Persist failed downloads so they survive a restart and appear in
       // history. They are never touched by cleanMissing() and can only be
       // removed by explicit delete.
+      // Error downloads: don't store file path, delete leftover partial files
+      final partialPath = _mergeDest ?? _ffmpegDest ?? _firstDest ?? '';
+      if (partialPath.isNotEmpty) {
+        try {
+          final f = File(partialPath);
+          if (await f.exists()) await f.delete();
+        } catch (_) {}
+      }
+      item.filePath = ''; // never store path for failed downloads
       await DownloadDb.save(item);
     }
+    _onDownloadFinished();
     notifyListeners();
   }
 
@@ -415,15 +543,34 @@ class AppState extends ChangeNotifier {
 
   // Cancel download
   Future<void> cancelDownload(String id) async {
+    // Remove from pending queue if it's still waiting
+    _downloadQueue.removeWhere((d) => d.id == id);
     ytDlp.killDownload(id);
     final idx = downloads.indexWhere((d) => d.id == id);
     if (idx == -1) return;
+    final wasActive = downloads[idx].status == DownloadStatus.downloading;
+    // Delete any leftover partial file before clearing the path
+    final partialPath = downloads[idx].partialPath;
+    if (partialPath.isNotEmpty) {
+      try {
+        final f = File(partialPath);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+      // Also try .part file that yt-dlp may create
+      try {
+        final partFile = File('$partialPath.part');
+        if (await partFile.exists()) await partFile.delete();
+      } catch (_) {}
+    }
     downloads[idx].status = DownloadStatus.error;
     downloads[idx].phase = DownloadPhase.complete;
     downloads[idx].errorMessage = 'Cancelled';
     downloads[idx].progress = 0.0;
+    downloads[idx].filePath = '';
+    downloads[idx].partialPath = '';
     // Persist the cancelled item so it shows in history after restart.
     await DownloadDb.save(downloads[idx]);
+    if (wasActive) _onDownloadFinished();
     notifyListeners();
   }
 
@@ -435,9 +582,28 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Cancel all active and queued downloads.
+  Future<void> cancelAllDownloads() async {
+    final toCancel = downloads
+        .where((d) =>
+            d.status == DownloadStatus.downloading ||
+            d.status == DownloadStatus.queued)
+        .map((d) => d.id)
+        .toList();
+    for (final id in toCancel) {
+      await cancelDownload(id);
+    }
+  }
+
   /// Permanently remove a record AND delete the file from disk then purge from DB.
   Future<void> permanentlyDelete(String id) async {
-    final item = downloads.firstWhere((d) => d.id == id, orElse: () => downloads.first);
+    final idx = downloads.indexWhere((d) => d.id == id);
+    if (idx == -1) {
+      // Record not in memory — just remove from DB
+      await DownloadDb.remove(id);
+      return;
+    }
+    final item = downloads[idx];
     // Prefer the exact file path; fall back to outputPath (treated as directory)
     final target = item.filePath.isNotEmpty ? item.filePath : item.outputPath;
     if (target.isNotEmpty) {

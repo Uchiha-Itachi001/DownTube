@@ -19,7 +19,8 @@ class DownloadsScreen extends StatefulWidget {
 
 class _DownloadsScreenState extends State<DownloadsScreen> {
   String _completedFilter = 'all';
-
+  String _activeTab = 'active'; // 'all', 'active', 'waiting'
+  bool _sortAscending = false; // false = newest first
 
 
   @override
@@ -106,8 +107,22 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   }
 
   Widget _buildActiveSection(List<DownloadItem> active) {
+    // Filter by active tab
+    final filtered = switch (_activeTab) {
+      'active' => active.where((d) => d.status == DownloadStatus.downloading).toList(),
+      'waiting' => active.where((d) => d.status == DownloadStatus.queued).toList(),
+      _ => List<DownloadItem>.from(active),
+    };
+    // Sort
+    if (_sortAscending) {
+      filtered.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    } else {
+      filtered.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+    final activeCount = active.where((d) => d.status == DownloadStatus.downloading).length;
+    final waitingCount = active.where((d) => d.status == DownloadStatus.queued).length;
     final inner =
-        active.isEmpty
+        filtered.isEmpty
             ? _emptyState(
               'No active downloads',
               Icons.download_outlined,
@@ -117,10 +132,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               spacing: 12,
               runSpacing: 12,
               children:
-                  active
+                  filtered
                       .map(
                         (item) => SizedBox(
-                          width: 260,
+                          width: 220,
                           child: _DownloadGridCard(
                             item: item,
                             onCancel:
@@ -140,10 +155,47 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       actions:
           active.isNotEmpty
               ? [
+                _FilterTab(
+                  label: 'All',
+                  selected: _activeTab == 'all',
+                  count: active.length,
+                  onTap: () => setState(() => _activeTab = 'all'),
+                ),
+                const SizedBox(width: 4),
+                _FilterTab(
+                  label: 'Active',
+                  selected: _activeTab == 'active',
+                  count: activeCount,
+                  onTap: () => setState(() => _activeTab = 'active'),
+                ),
+                const SizedBox(width: 4),
+                _FilterTab(
+                  label: 'Waiting',
+                  selected: _activeTab == 'waiting',
+                  count: waitingCount,
+                  onTap: () => setState(() => _activeTab = 'waiting'),
+                ),
+                const SizedBox(width: 8),
                 SectionAction(
-                  label: 'Clear Done',
-                  icon: Icons.clear_all_rounded,
-                  onTap: () {},
+                  label: _sortAscending ? 'Oldest' : 'Newest',
+                  icon: _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                  onTap: () => setState(() => _sortAscending = !_sortAscending),
+                ),
+                const SizedBox(width: 4),
+                SectionAction(
+                  label: 'Cancel All',
+                  icon: Icons.cancel_rounded,
+                  onTap: () async {
+                    final ok = await _showConfirmDialog(
+                      context,
+                      title: 'Cancel All Downloads',
+                      body: 'Stop all ${active.length} active and queued downloads?',
+                      confirmLabel: 'Cancel All',
+                      confirmColor: AppColors.red,
+                      icon: Icons.cancel_rounded,
+                    );
+                    if (ok) AppState.instance.cancelAllDownloads();
+                  },
                 ),
               ]
               : null,
@@ -178,7 +230,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                   filtered
                       .map(
                         (item) => SizedBox(
-                          width: 200,
+                          width: 180,
                           child: _DownloadGridCard(item: item),
                         ),
                       )
@@ -653,12 +705,25 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                     ),
                   ],
                   const SizedBox(height: 8),
-                  // Quality + action buttons row
+                  // Format + action buttons row
                   Row(
                     children: [
-                      _QualityBadge(
-                        resolution: item.resolution,
-                        format: item.format,
+                      // Format badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(
+                          widget.item.format.toUpperCase(),
+                          style: AppTextStyles.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.muted,
+                          ),
+                        ),
                       ),
                       const Spacer(),
                       if (widget.onCancel != null)
@@ -667,6 +732,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                           label: 'Cancel',
                           color: AppColors.red,
                           onTap: _confirmCancel,
+                          compact: true,
                         ),
                     ],
                   ),
@@ -763,6 +829,27 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
               ),
             ),
           ),
+        // Quality badge (bottom-right of thumbnail) — resolution only, same style as type badge
+        Positioned(
+          bottom: 6,
+          right: 6,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.72),
+              border: Border.all(color: accent.withOpacity(0.55)),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              widget.item.resolution,
+              style: AppTextStyles.outfit(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: accent,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -838,11 +925,13 @@ class _ActionButton extends StatefulWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final bool compact;
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    this.compact = false,
   });
 
   @override
@@ -862,8 +951,11 @@ class _ActionButtonState extends State<_ActionButton> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          margin: const EdgeInsets.only(left: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          margin: const EdgeInsets.only(left: 4),
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.compact ? 7 : 10,
+            vertical: widget.compact ? 3 : 5,
+          ),
           decoration: BoxDecoration(
             color:
                 _hovered
@@ -880,12 +972,12 @@ class _ActionButtonState extends State<_ActionButton> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(widget.icon, size: 12, color: widget.color),
+              Icon(widget.icon, size: widget.compact ? 10 : 12, color: widget.color),
               const SizedBox(width: 4),
               Text(
                 widget.label,
                 style: AppTextStyles.outfit(
-                  fontSize: 10,
+                  fontSize: widget.compact ? 9 : 10,
                   fontWeight: FontWeight.w600,
                   color: widget.color,
                 ),
@@ -1079,7 +1171,7 @@ class _FilterTab extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color:
-                selected ? AppColors.accent.withOpacity(0.40) : AppColors.border,
+                selected ? AppColors.accent.withOpacity(0.40) : AppColors.accent.withOpacity(0.20),
           ),
         ),
         child: Row(

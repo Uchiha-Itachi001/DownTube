@@ -38,7 +38,7 @@ class Sidebar extends StatelessWidget {
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: drawerMode
-            ? const Color(0xFF111418).withOpacity(0.70)
+            ? const Color(0xFF111418).withOpacity(0.93)
             : AppColors.surfaceTransparent,
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.25)),
         borderRadius: BorderRadius.circular(AppColors.radius),
