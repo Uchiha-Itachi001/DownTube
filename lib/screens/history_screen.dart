@@ -112,6 +112,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   const SizedBox(height: AppColors.gap),
                   _buildHistoryList(filtered, shrinkWrap: true),
                   const SizedBox(height: AppColors.gap),
+                  _buildTotalDownloads(done),
+                  const SizedBox(height: AppColors.gap),
                   _buildAllTimeStats(done, failed),
                   const SizedBox(height: AppColors.gap),
                   _buildWeeklyChart(),
@@ -138,6 +140,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
+                      _buildTotalDownloads(done),
+                      const SizedBox(height: AppColors.gap),
                       _buildAllTimeStats(done, failed),
                       const SizedBox(height: AppColors.gap),
                       _buildWeeklyChart(),
@@ -304,6 +308,50 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 textAlign: TextAlign.center),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTotalDownloads(int done) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceTransparent,
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
+        borderRadius: BorderRadius.circular(AppColors.radius),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.cloud_done_rounded, size: 14, color: AppColors.accent),
+              const SizedBox(width: 8),
+              Text(
+                'TOTAL DOWNLOADS',
+                style: AppTextStyles.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.muted,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '$done',
+            style: AppTextStyles.syne(
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'All time completed',
+            style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted),
+          ),
+        ],
       ),
     );
   }

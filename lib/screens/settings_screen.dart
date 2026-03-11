@@ -9,7 +9,8 @@ import '../widgets/app_notification.dart';
 import '../widgets/toggle_switch.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final VoidCallback? onReload;
+  const SettingsScreen({super.key, this.onReload});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -17,6 +18,14 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   int _selectedNav = 0;
+  bool _hasUnsavedChanges = false;
+
+  // Pending values for deferred-save settings
+  late int _pendingConcurrent;
+  late int _pendingMaxLimit;
+  Color? _pendingThemeColor;
+
+  static const _maxLimitOptions = [10, 25, 50, 100, 200, 500, 1000];
 
   static const _navItems = <({IconData icon, String label})>[
     (icon: Icons.download_rounded, label: 'Downloads'),
@@ -37,6 +46,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    final state = AppState.instance;
+    _pendingConcurrent = state.maxConcurrentDownloads;
+    final stored = state.maxDownloadLimit;
+    _pendingMaxLimit = _maxLimitOptions.contains(stored) ? stored : 1000;
     _firstNameCtrl = TextEditingController(
       text: AppState.instance.userFirstName ?? '',
     );
@@ -335,31 +348,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         _settingRow(
-          'Max Concurrent Downloads',
-          state.autoDownload
-              ? 'Auto-managed based on queue size (1-500)'
-              : 'Number of files downloading simultaneously (1-500)',
+          'Concurrent Downloads',
+          'Number of files downloading simultaneously (1–6)',
           icon: Icons.downloading_rounded,
-          trailing: state.autoDownload
-              ? Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentDim,
-                    border: Border.all(
-                        color: AppColors.accent.withOpacity(0.25)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Auto',
-                    style: AppTextStyles.outfit(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                )
-              : const SizedBox.shrink(),
+          trailing: _dropdown(
+            _pendingConcurrent.toString(),
+            ['1', '2', '3', '4', '5', '6'],
+            (v) {
+              setState(() {
+                _pendingConcurrent = int.parse(v);
+                _hasUnsavedChanges =
+                    _pendingConcurrent != state.maxConcurrentDownloads ||
+                    _pendingMaxLimit != state.maxDownloadLimit;
+              });
+            },
+          ),
+        ),
+        _settingRow(
+          'Max Download Limit',
+          'Maximum number of downloads allowed in the queue (1–1000)',
+          icon: Icons.playlist_add_check_rounded,
+          trailing: _dropdown(
+            _pendingMaxLimit.toString(),
+            _maxLimitOptions.map((v) => v.toString()).toList(),
+            (v) {
+              setState(() {
+                _pendingMaxLimit = int.parse(v);
+                _hasUnsavedChanges =
+                    _pendingConcurrent != state.maxConcurrentDownloads ||
+                    _pendingMaxLimit != state.maxDownloadLimit;
+              });
+            },
+          ),
         ),
         _settingRow(
           'Embed Subtitles',
@@ -388,7 +408,105 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (v) => state.setAddChapters(v),
           ),
         ),
+        if (_hasUnsavedChanges) ...[
+          const SizedBox(height: 12),
+          _applyButton(),
+        ],
       ],
+    );
+  }
+
+  Widget _applyButton() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: GestureDetector(
+        onTap: () async {
+          final state = AppState.instance;
+          await state.setConcurrentDownloads(_pendingConcurrent);
+          await state.setMaxDownloadLimit(_pendingMaxLimit);
+          setState(() => _hasUnsavedChanges = false);
+          widget.onReload?.call();
+          if (mounted) {
+            showAppNotification(
+              context,
+              type: NotificationType.success,
+              message: 'Download settings applied',
+              duration: const Duration(seconds: 2),
+            );
+          }
+        },
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.save_rounded,
+                    size: 16, color: Colors.black),
+                const SizedBox(width: 8),
+                Text(
+                  'Apply Changes',
+                  style: AppTextStyles.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionReloadButton() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: GestureDetector(
+        onTap: () {
+          widget.onReload?.call();
+          if (mounted) {
+            showAppNotification(
+              context,
+              type: NotificationType.success,
+              message: 'Settings applied',
+              duration: const Duration(seconds: 2),
+            );
+          }
+        },
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_rounded, size: 16, color: Colors.black),
+                const SizedBox(width: 8),
+                Text(
+                  'Apply Changes',
+                  style: AppTextStyles.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -422,6 +540,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'WEBM',
           ], (v) => state.setDefaultFormat(v)),
         ),
+        const SizedBox(height: 12),
+        _sectionReloadButton(),
       ],
     );
   }
@@ -456,6 +576,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '320 kbps',
           ], (v) => state.setAudioBitrate(v)),
         ),
+        const SizedBox(height: 12),
+        _sectionReloadButton(),
       ],
     );
   }
@@ -474,6 +596,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 12),
         _buildStorageBreakdown(),
+        const SizedBox(height: 12),
+        _sectionReloadButton(),
       ],
     );
   }
@@ -605,6 +729,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (v) => state.setSoundEffects(v),
           ),
         ),
+        const SizedBox(height: 12),
+        _sectionReloadButton(),
       ],
     );
   }
@@ -612,12 +738,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // --- APPEARANCE ----------------------------------------------------------
 
   Widget _appearanceSection() {
+    final currentColor = AppState.instance.themeColor;
+    final previewColor = _pendingThemeColor ?? currentColor;
+    final hasPending = _pendingThemeColor != null &&
+        _pendingThemeColor!.toARGB32() != currentColor.toARGB32();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _settingRow(
           'Accent Color',
-          'Choose the app accent color. Changes take effect immediately.',
+          'Select a color then press Apply Changes to update the theme.',
           icon: Icons.palette_rounded,
           trailing: const SizedBox.shrink(),
         ),
@@ -626,14 +756,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           spacing: 12,
           runSpacing: 12,
           children: AppColors.themeOptions.map((opt) {
-            final isSelected = AppState.instance.themeColor.toARGB32() ==
-                opt.color.toARGB32();
+            final isApplied = currentColor.toARGB32() == opt.color.toARGB32();
+            final isPending = previewColor.toARGB32() == opt.color.toARGB32();
             return GestureDetector(
-              onTap: () => AppState.instance.setThemeColor(opt.color),
+              onTap: () => setState(() => _pendingThemeColor = opt.color),
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: Tooltip(
-                  message: opt.name,
+                  message: isPending && !isApplied
+                      ? '${opt.name} (pending)'
+                      : opt.name,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: 44,
@@ -642,29 +774,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: opt.color,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color:
-                            isSelected ? Colors.white : Colors.transparent,
-                        width: 2.5,
+                        color: isPending
+                            ? Colors.white
+                            : Colors.transparent,
+                        width: isPending && !isApplied ? 3.0 : 2.5,
                       ),
-                      boxShadow: isSelected
+                      boxShadow: isPending
                           ? [
                               BoxShadow(
-                                color: opt.color.withValues(alpha: 0.5),
-                                blurRadius: 12,
+                                color: opt.color.withValues(alpha: 0.6),
+                                blurRadius: 14,
                               ),
                             ]
                           : [],
                     ),
-                    child: isSelected
+                    child: isApplied
                         ? const Icon(Icons.check_rounded,
                             color: Colors.black, size: 20)
-                        : null,
+                        : isPending
+                            ? Icon(Icons.circle,
+                                color: Colors.white.withValues(alpha: 0.7),
+                                size: 10)
+                            : null,
                   ),
                 ),
               ),
             );
           }).toList(),
         ),
+        if (hasPending) ...[          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () async {
+                if (_pendingThemeColor != null) {
+                  await AppState.instance.setThemeColor(_pendingThemeColor!);
+                  setState(() => _pendingThemeColor = null);
+                }
+                widget.onReload?.call();
+                if (mounted) {
+                  showAppNotification(
+                    context,
+                    type: NotificationType.success,
+                    message: 'Appearance applied',
+                    duration: const Duration(seconds: 2),
+                  );
+                }
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _pendingThemeColor ?? AppColors.accent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.palette_rounded,
+                          size: 16, color: Colors.black),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Apply Changes',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

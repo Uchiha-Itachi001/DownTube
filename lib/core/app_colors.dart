@@ -55,5 +55,9 @@ class AppColors {
     (name: 'Pink', color: Color(0xFFEC4899)),
     (name: 'Cyan', color: Color(0xFF06B6D4)),
     (name: 'Amber', color: Color(0xFFF59E0B)),
+    (name: 'Lime', color: Color(0xFF84CC16)),
+    (name: 'Teal', color: Color(0xFF14B8A6)),
+    (name: 'Indigo', color: Color(0xFF6366F1)),
+    (name: 'Rose', color: Color(0xFFF43F5E)),
   ];
 }

@@ -90,8 +90,6 @@ class AppState extends ChangeNotifier {
   /// Resets every preference to its factory default.
   Future<void> resetAllSettings() async {
     await setThemeColor(AppColors.green);
-    await _prefs?.clearDownloadPath();
-    downloadPath = null;
     autoDownload = true;
     embedSubs = true;
     saveThumbnail = true;
@@ -134,7 +132,8 @@ class AppState extends ChangeNotifier {
 
   // Downloads
   final List<DownloadItem> downloads = [];
-  static const int maxConcurrentDownloads = 6;
+  int maxConcurrentDownloads = 4;
+  int maxDownloadLimit = 1000;
   int _activeDownloadCount = 0;
   final List<DownloadItem> _downloadQueue = [];
 
@@ -183,6 +182,8 @@ class AppState extends ChangeNotifier {
     defaultFormat = _prefs!.defaultFormat;
     defaultAudioFormat = _prefs!.defaultAudioFormat;
     audioBitrate = _prefs!.audioBitrate;
+    maxConcurrentDownloads = _prefs!.concurrentDownloads;
+    maxDownloadLimit = _prefs!.maxDownloadLimit;
 
     ytDlpReady =
         await ytDlp.detectPath(savedPath: _prefs!.ytDlpPath);
@@ -385,6 +386,8 @@ class AppState extends ChangeNotifier {
     String? _ffmpegDest;  // [ffmpeg] Destination: path (audio conversion)
 
     try {
+      // Track this download as active for cleanup on error/cancel
+      await DownloadDb.trackActive(item.id, effectivePath);
       await for (final line in ytDlp.startDownload(
         id: item.id,
         url: item.url,
@@ -399,7 +402,8 @@ class AppState extends ChangeNotifier {
           // Capture the first destination as likely-final for single-stream DLs
           if (destinationCount == 1) {
             _firstDest = line.substring(line.indexOf('Destination:') + 'Destination:'.length).trim();
-            item.partialPath = _firstDest!;
+            item.partialPath = _firstDest;
+            DownloadDb.updateActivePartialPath(item.id, _firstDest);
             // First file — video (or audio for audio-only)
             item.phase = audioOnly ? DownloadPhase.audio : DownloadPhase.video;
             item.progress = 0.0;
@@ -423,12 +427,14 @@ class AppState extends ChangeNotifier {
             final idx = line.indexOf('into ');
             if (idx != -1) {
               _mergeDest = line.substring(idx + 5).trim().replaceAll('"', '');
-              item.partialPath = _mergeDest!;
+              item.partialPath = _mergeDest;
+              DownloadDb.updateActivePartialPath(item.id, _mergeDest);
             }
           } else if (line.contains('Destination:')) {
             // audio-only: [ffmpeg] or [ExtractAudio] Destination: path
             _ffmpegDest = line.substring(line.indexOf('Destination:') + 'Destination:'.length).trim();
-            item.partialPath = _ffmpegDest!;
+            item.partialPath = _ffmpegDest;
+            DownloadDb.updateActivePartialPath(item.id, _ffmpegDest);
           }
           // Merging video+audio OR ffmpeg audio conversion
           item.phase = DownloadPhase.merging;
@@ -504,6 +510,8 @@ class AppState extends ChangeNotifier {
         subtitle: item.title,
         type: DownloadNotifType.mergeDone,
       ));
+      // No longer active – remove tracking row
+      await DownloadDb.removeActive(item.id);
       // Persist to SQLite
       await DownloadDb.save(item);
     } catch (e) {
@@ -521,6 +529,7 @@ class AppState extends ChangeNotifier {
         } catch (_) {}
       }
       item.filePath = ''; // never store path for failed downloads
+      await DownloadDb.removeActive(item.id);
       await DownloadDb.save(item);
     }
     _onDownloadFinished();
@@ -568,7 +577,8 @@ class AppState extends ChangeNotifier {
     downloads[idx].progress = 0.0;
     downloads[idx].filePath = '';
     downloads[idx].partialPath = '';
-    // Persist the cancelled item so it shows in history after restart.
+    // Remove from active tracking and persist the cancelled item
+    await DownloadDb.removeActive(id);
     await DownloadDb.save(downloads[idx]);
     if (wasActive) _onDownloadFinished();
     notifyListeners();
@@ -584,6 +594,8 @@ class AppState extends ChangeNotifier {
 
   /// Cancel all active and queued downloads.
   Future<void> cancelAllDownloads() async {
+    // Cleanup leftover partial files for all tracked active downloads
+    await DownloadDb.cleanupAllActiveLeftovers();
     final toCancel = downloads
         .where((d) =>
             d.status == DownloadStatus.downloading ||
@@ -782,6 +794,18 @@ class AppState extends ChangeNotifier {
   Future<void> setAudioBitrate(String v) async {
     audioBitrate = v;
     await _prefs?.setAudioBitrate(v);
+    notifyListeners();
+  }
+
+  Future<void> setConcurrentDownloads(int v) async {
+    maxConcurrentDownloads = v.clamp(1, 6);
+    await _prefs?.setConcurrentDownloads(maxConcurrentDownloads);
+    notifyListeners();
+  }
+
+  Future<void> setMaxDownloadLimit(int v) async {
+    maxDownloadLimit = v.clamp(1, 1000);
+    await _prefs?.setMaxDownloadLimit(maxDownloadLimit);
     notifyListeners();
   }
 }

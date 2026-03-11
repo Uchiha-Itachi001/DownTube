@@ -12,7 +12,7 @@ import '../models/download_item.dart';
 /// • Uses [sqflite_common_ffi] so it works on Windows / Linux desktop.
 class DownloadDb {
   static const _dbName = 'downtube_history.db';
-  static const _version = 6;
+  static const _version = 8;
   static Database? _db;
 
   static Future<Database> get _database async {
@@ -28,27 +28,39 @@ class DownloadDb {
       path,
       options: OpenDatabaseOptions(
         version: _version,
-        onCreate: (db, _) => db.execute('''
-          CREATE TABLE downloads (
-            id          TEXT PRIMARY KEY,
-            title       TEXT NOT NULL,
-            url         TEXT,
-            output_path TEXT,
-            resolution  TEXT,
-            format      TEXT,
-            thumbnail_url TEXT,
-            extractor   TEXT,
-            status      TEXT,
-            created_at  INTEGER NOT NULL,
-            download_index INTEGER NOT NULL DEFAULT 0,
-            show_in_history INTEGER NOT NULL DEFAULT 1,
-            show_in_library INTEGER NOT NULL DEFAULT 1,
-            file_path       TEXT NOT NULL DEFAULT '',
-            file_size       TEXT,
-            video_duration  INTEGER,
-            error_message   TEXT
-          )
-        '''),
+        onCreate: (db, _) async {
+          await db.execute('''
+            CREATE TABLE downloads (
+              id          TEXT PRIMARY KEY,
+              title       TEXT NOT NULL,
+              url         TEXT,
+              output_path TEXT,
+              resolution  TEXT,
+              format      TEXT,
+              thumbnail_url TEXT,
+              extractor   TEXT,
+              status      TEXT,
+              created_at  INTEGER NOT NULL,
+              download_index INTEGER NOT NULL DEFAULT 0,
+              show_in_history INTEGER NOT NULL DEFAULT 1,
+              show_in_library INTEGER NOT NULL DEFAULT 1,
+              file_path       TEXT NOT NULL DEFAULT '',
+              file_size       TEXT,
+              video_duration  INTEGER,
+              error_message   TEXT,
+              playlist_id     TEXT,
+              playlist_title  TEXT
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE active_downloads (
+              id           TEXT PRIMARY KEY,
+              partial_path TEXT NOT NULL DEFAULT '',
+              output_dir   TEXT NOT NULL DEFAULT '',
+              started_at   INTEGER NOT NULL
+            )
+          ''');
+        },
         onUpgrade: (db, oldVer, newVer) async {
           if (oldVer < 2) {
             await db.execute(
@@ -74,6 +86,20 @@ class DownloadDb {
           }
           if (oldVer < 6) {
             await db.execute('ALTER TABLE downloads ADD COLUMN error_message TEXT');
+          }
+          if (oldVer < 7) {
+            await db.execute('ALTER TABLE downloads ADD COLUMN playlist_id TEXT');
+            await db.execute('ALTER TABLE downloads ADD COLUMN playlist_title TEXT');
+          }
+          if (oldVer < 8) {
+            await db.execute('''
+              CREATE TABLE IF NOT EXISTS active_downloads (
+                id           TEXT PRIMARY KEY,
+                partial_path TEXT NOT NULL DEFAULT '',
+                output_dir   TEXT NOT NULL DEFAULT '',
+                started_at   INTEGER NOT NULL
+              )
+            ''');
           }
         },
       ),
@@ -145,5 +171,68 @@ class DownloadDb {
   static Future<void> clearAll() async {
     final db = await _database;
     await db.delete('downloads');
+  }
+
+  // --- Active Downloads Tracking ---
+
+  /// Track an actively downloading item with its output directory.
+  static Future<void> trackActive(String id, String outputDir) async {
+    final db = await _database;
+    await db.insert(
+      'active_downloads',
+      {
+        'id': id,
+        'partial_path': '',
+        'output_dir': outputDir,
+        'started_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Update the partial file path for an actively downloading item.
+  static Future<void> updateActivePartialPath(String id, String partialPath) async {
+    final db = await _database;
+    await db.update(
+      'active_downloads',
+      {'partial_path': partialPath},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Remove tracking for a completed/cancelled download.
+  static Future<void> removeActive(String id) async {
+    final db = await _database;
+    await db.delete('active_downloads', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Get all currently tracked active downloads (for cleanup on startup or cancel-all).
+  static Future<List<Map<String, dynamic>>> getActiveDownloads() async {
+    final db = await _database;
+    return db.query('active_downloads');
+  }
+
+  /// Clean up all tracked active downloads and delete their partial files.
+  static Future<int> cleanupAllActiveLeftovers() async {
+    final db = await _database;
+    final rows = await db.query('active_downloads');
+    int cleaned = 0;
+    for (final row in rows) {
+      final partialPath = row['partial_path'] as String? ?? '';
+      if (partialPath.isNotEmpty) {
+        // Delete the partial file and any .part companion
+        try {
+          final f = File(partialPath);
+          if (await f.exists()) { await f.delete(); cleaned++; }
+        } catch (_) {}
+        try {
+          final partFile = File('$partialPath.part');
+          if (await partFile.exists()) { await partFile.delete(); cleaned++; }
+        } catch (_) {}
+      }
+    }
+    await db.delete('active_downloads');
+    return cleaned;
   }
 }

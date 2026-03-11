@@ -24,6 +24,9 @@ class PrefsService {
   // Audio defaults
   static const _keyDefaultAudioFormat = 'default_audio_format';
   static const _keyAudioBitrate = 'audio_bitrate';
+  // Concurrent / limit
+  static const _keyConcurrentDownloads = 'concurrent_downloads';
+  static const _keyMaxDownloadLimit = 'max_download_limit';
 
   final SharedPreferences _prefs;
   PrefsService._(this._prefs);
@@ -110,4 +113,15 @@ class PrefsService {
   String get audioBitrate => _prefs.getString(_keyAudioBitrate) ?? '320 kbps';
   Future<void> setAudioBitrate(String v) =>
       _prefs.setString(_keyAudioBitrate, v);
+
+  // Concurrent / limit
+  int get concurrentDownloads =>
+      _prefs.getInt(_keyConcurrentDownloads) ?? 4;
+  Future<void> setConcurrentDownloads(int v) =>
+      _prefs.setInt(_keyConcurrentDownloads, v);
+
+  int get maxDownloadLimit =>
+      _prefs.getInt(_keyMaxDownloadLimit) ?? 1000;
+  Future<void> setMaxDownloadLimit(int v) =>
+      _prefs.setInt(_keyMaxDownloadLimit, v);
 }

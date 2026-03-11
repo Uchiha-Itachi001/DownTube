@@ -160,6 +160,8 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
         thumbnailUrl: entry.thumbnail,
         extractor: 'youtube',
         videoDuration: entry.duration,
+        playlistId: info.id,
+        playlistTitle: info.title,
       );
       AppState.instance.enqueueDownload(item);
       existingUrls.add(entry.url); // prevent dups within same batch
@@ -176,6 +178,7 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
     // Skip if already enqueued
     if (AppState.instance.downloads.any((d) => d.url == entry.url)) return;
     final resolution = _rowQualityOverrides[entry.id] ?? _globalQuality;
+    final info = _info;
     final item = DownloadItem(
       title: entry.title,
       url: entry.url,
@@ -185,6 +188,8 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
       thumbnailUrl: entry.thumbnail,
       extractor: 'youtube',
       videoDuration: entry.duration,
+      playlistId: info?.id,
+      playlistTitle: info?.title,
     );
     AppState.instance.enqueueDownload(item);
     widget.onDownloadOne?.call();

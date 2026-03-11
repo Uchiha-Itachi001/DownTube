@@ -105,7 +105,7 @@ class _AppShellState extends State<AppShell>
       case 3:
         return const HistoryScreen();
       case 4:
-        return const SettingsScreen();
+        return SettingsScreen(onReload: _onRefresh);
       default:
         return DashboardScreen(onAnalyze: _goToAnalyzed);
     }

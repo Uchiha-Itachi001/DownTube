@@ -313,7 +313,11 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   }
 
   Widget _buildSessionStats(List<DownloadItem> all) {
-    final done = all.where((d) => d.status == DownloadStatus.done).length;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final doneToday = all.where((d) =>
+        d.status == DownloadStatus.done &&
+        d.createdAt.isAfter(today)).length;
     final active =
         all.where((d) => d.status == DownloadStatus.downloading).length;
     return SectionCard(
@@ -327,7 +331,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: StatTile(value: '$done', label: 'Done Today', unit: ''),
+                child: StatTile(value: '$doneToday', label: 'Done Today', unit: ''),
               ),
             ],
           ),
@@ -651,40 +655,29 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                           ),
                     ),
                   ],
-                  if (_isActive && item.speed != null) ...[
+                  if (_isActive) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(
-                          Icons.speed_rounded,
-                          size: 10,
-                          color: AppColors.muted2,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          item.speed!,
-                          style: AppTextStyles.outfit(
-                            fontSize: 10,
-                            color: AppColors.muted2,
-                          ),
-                        ),
-                        
                         if (item.eta != null) ...[
-                          const SizedBox(width: 8),
                           Icon(
                             Icons.timer_outlined,
                             size: 10,
                             color: AppColors.muted2,
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            item.eta!,
-                            style: AppTextStyles.outfit(
-                              fontSize: 10,
-                              color: AppColors.muted2,
+                          Flexible(
+                            child: Text(
+                              item.eta!,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.outfit(
+                                fontSize: 10,
+                                color: AppColors.muted2,
+                              ),
                             ),
                           ),
-                          if (item.fileSize != null) ...[
+                        ],
+                        if (item.fileSize != null) ...[
                           const SizedBox(width: 8),
                           Icon(
                             Icons.data_usage_rounded,
@@ -692,14 +685,16 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                             color: AppColors.muted2,
                           ),
                           const SizedBox(width: 3),
-                          Text(
-                            item.fileSize!,
-                            style: AppTextStyles.outfit(
-                              fontSize: 10,
-                              color: AppColors.muted2,
+                          Flexible(
+                            child: Text(
+                              item.fileSize!,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyles.outfit(
+                                fontSize: 10,
+                                color: AppColors.muted2,
+                              ),
                             ),
                           ),
-                        ],
                         ],
                       ],
                     ),

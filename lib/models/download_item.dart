@@ -35,6 +35,9 @@ class DownloadItem {
   String? fileSize;
   /// Video duration in seconds from VideoInfo (set at enqueue time).
   int? videoDuration;
+  /// Playlist metadata (set when download is part of a playlist).
+  String? playlistId;
+  String? playlistTitle;
   /// Transient: tracks the current partial download path for cleanup on cancel.
   /// Not persisted to DB.
   String partialPath = '';
@@ -77,6 +80,8 @@ class DownloadItem {
     this.filePath = '',
     this.fileSize,
     this.videoDuration,
+    this.playlistId,
+    this.playlistTitle,
     DateTime? createdAt,
     List<double>? speedHistory,
   })  : id = id ?? const Uuid().v4(),
@@ -115,6 +120,8 @@ class DownloadItem {
         'file_size': fileSize,
         'video_duration': videoDuration,
         'error_message': errorMessage,
+        'playlist_id': playlistId,
+        'playlist_title': playlistTitle,
       };
 
   factory DownloadItem.fromDbMap(Map<String, dynamic> row) => DownloadItem(
@@ -140,6 +147,8 @@ class DownloadItem {
         fileSize: row['file_size'] as String?,
         videoDuration: row['video_duration'] as int?,
         errorMessage: row['error_message'] as String?,
+        playlistId: row['playlist_id'] as String?,
+        playlistTitle: row['playlist_title'] as String?,
         createdAt: DateTime.fromMillisecondsSinceEpoch(
             (row['created_at'] as int?) ?? DateTime.now().millisecondsSinceEpoch),
       );
