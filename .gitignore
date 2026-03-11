@@ -48,6 +48,9 @@ app.*.map.json
 assetes/images/Dev_Img.png
 assetes/images/profile_*.png
 
+# Installer folder
+/installers/
+
 # Environment & secrets
 .env
 *.env
