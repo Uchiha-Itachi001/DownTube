@@ -33,6 +33,8 @@ class PlaylistAnalyzedScreen extends StatefulWidget {
 class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
   String _globalQuality = '1080p';
   String _globalFormat = 'MP4';
+  String _globalAudioFormat = 'MP3';
+  bool _isAudioMode = false;
   String? _outputPath;
   final Set<String> _checkedEntries = {};
   final Set<String> _userUncheckedEntries = {};
@@ -42,6 +44,7 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
 
   static const _qualities = ['Best', '4K', '1440p', '1080p', '720p', '480p', '360p'];
   static const _formats = ['MP4', 'MKV', 'WEBM'];
+  static const _audioFormats = ['MP3', 'M4A', 'FLAC', 'WAV', 'OGG'];
 
   @override
   void initState() {
@@ -98,12 +101,6 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
     super.dispose();
   }
 
-  /// Show full skeleton only before we have ANY playlist metadata.
-  bool get _isLoading {
-    final state = AppState.instance.playlistFetchState;
-    return state == PlaylistFetchState.idle;
-  }
-
   /// True while entries are still streaming in.
   bool get _isStreamingEntries =>
       AppState.instance.playlistFetchState == PlaylistFetchState.loadingEntries;
@@ -120,7 +117,7 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
           if (e.isAvailable) _checkedEntries.add(e.id);
         }
       } else if (!_selectAll && _info != null) {
-        // User deselected all — track them as unchecked
+        // User deselected all track them as unchecked
         for (final e in _info!.entries) {
           if (e.isAvailable) _userUncheckedEntries.add(e.id);
         }
@@ -142,55 +139,109 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
     });
   }
 
+  // Shared helper — enqueue all selected entries to a specific folder.
+  void _enqueueEntries(String outputPath, PlaylistInfo info) {
+    final selected = info.entries.where((e) => _checkedEntries.contains(e.id) && e.isAvailable);
+    // Only skip entries that are currently active (queued/downloading/paused).
+    // Completed or errored downloads can be re-downloaded to a different folder.
+    final activeUrls = AppState.instance.downloads
+        .where((d) =>
+            d.status == DownloadStatus.queued ||
+            d.status == DownloadStatus.downloading ||
+            d.status == DownloadStatus.paused)
+        .map((d) => d.url)
+        .toSet();
+    for (final entry in selected) {
+      if (activeUrls.contains(entry.url)) continue;
+      final DownloadItem item;
+      if (_isAudioMode) {
+        item = DownloadItem(
+          title: entry.title,
+          url: entry.url,
+          resolution: '320k',
+          format: _globalAudioFormat.toLowerCase(),
+          outputPath: outputPath,
+          thumbnailUrl: entry.thumbnail,
+          extractor: 'youtube',
+          videoDuration: entry.duration,
+          playlistId: info.id,
+          playlistTitle: info.title,
+        );
+      } else {
+        final resolution = _rowQualityOverrides[entry.id] ?? _globalQuality;
+        item = DownloadItem(
+          title: entry.title,
+          url: entry.url,
+          resolution: resolution,
+          format: _globalFormat,
+          outputPath: outputPath,
+          thumbnailUrl: entry.thumbnail,
+          extractor: 'youtube',
+          videoDuration: entry.duration,
+          playlistId: info.id,
+          playlistTitle: info.title,
+        );
+      }
+      AppState.instance.enqueueDownload(item);
+      activeUrls.add(entry.url);
+    }
+  }
+
   void _onDownloadAll() {
     final info = _info;
     if (info == null) return;
-    final selected = info.entries.where((e) => _checkedEntries.contains(e.id) && e.isAvailable);
-    // Collect URLs already enqueued to avoid duplicate downloads
-    final existingUrls = AppState.instance.downloads.map((d) => d.url).toSet();
-    for (final entry in selected) {
-      if (existingUrls.contains(entry.url)) continue; // skip already-enqueued
-      final resolution = _rowQualityOverrides[entry.id] ?? _globalQuality;
-      final item = DownloadItem(
-        title: entry.title,
-        url: entry.url,
-        resolution: resolution,
-        format: _globalFormat,
-        outputPath: _outputPath ?? AppState.instance.downloadPath ?? '',
-        thumbnailUrl: entry.thumbnail,
-        extractor: 'youtube',
-        videoDuration: entry.duration,
-        playlistId: info.id,
-        playlistTitle: info.title,
-      );
-      AppState.instance.enqueueDownload(item);
-      existingUrls.add(entry.url); // prevent dups within same batch
-    }
+    final path = _outputPath ?? AppState.instance.downloadPath ?? '';
+    _enqueueEntries(path, info);
     widget.onDownloadAll?.call();
   }
 
   void _onQueueAll() {
-    _onDownloadAll(); // same queuing logic — already navigates via onDownloadAll
+    final info = _info;
+    if (info == null) return;
+    final path = _outputPath ?? AppState.instance.downloadPath ?? '';
+    _enqueueEntries(path, info);
     widget.onQueueAll?.call();
   }
 
   void _onDownloadOne(PlaylistEntry entry) {
-    // Skip if already enqueued
-    if (AppState.instance.downloads.any((d) => d.url == entry.url)) return;
-    final resolution = _rowQualityOverrides[entry.id] ?? _globalQuality;
+    // Skip only if currently active (not completed/errored — user may re-download)
+    final isActive = AppState.instance.downloads.any((d) =>
+        d.url == entry.url &&
+        (d.status == DownloadStatus.queued ||
+         d.status == DownloadStatus.downloading ||
+         d.status == DownloadStatus.paused));
+    if (isActive) return;
+    final outputPath = _outputPath ?? AppState.instance.downloadPath ?? '';
     final info = _info;
-    final item = DownloadItem(
-      title: entry.title,
-      url: entry.url,
-      resolution: resolution,
-      format: _globalFormat,
-      outputPath: _outputPath ?? AppState.instance.downloadPath ?? '',
-      thumbnailUrl: entry.thumbnail,
-      extractor: 'youtube',
-      videoDuration: entry.duration,
-      playlistId: info?.id,
-      playlistTitle: info?.title,
-    );
+    final DownloadItem item;
+    if (_isAudioMode) {
+      item = DownloadItem(
+        title: entry.title,
+        url: entry.url,
+        resolution: '320k',
+        format: _globalAudioFormat.toLowerCase(),
+        outputPath: outputPath,
+        thumbnailUrl: entry.thumbnail,
+        extractor: 'youtube',
+        videoDuration: entry.duration,
+        playlistId: info?.id,
+        playlistTitle: info?.title,
+      );
+    } else {
+      final resolution = _rowQualityOverrides[entry.id] ?? _globalQuality;
+      item = DownloadItem(
+        title: entry.title,
+        url: entry.url,
+        resolution: resolution,
+        format: _globalFormat,
+        outputPath: outputPath,
+        thumbnailUrl: entry.thumbnail,
+        extractor: 'youtube',
+        videoDuration: entry.duration,
+        playlistId: info?.id,
+        playlistTitle: info?.title,
+      );
+    }
     AppState.instance.enqueueDownload(item);
     widget.onDownloadOne?.call();
   }
@@ -202,7 +253,9 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return _buildSkeleton();
+    if (_info == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -244,84 +297,110 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
             ),
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Text(
-                    info.title,
-                    style: AppTextStyles.outfit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  // Channel
-                  if (info.channelName != null)
-                    Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Scrollable info + settings
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.person_outline_rounded, size: 13, color: AppColors.muted),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            info.channelName!,
-                            style: AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
-                            overflow: TextOverflow.ellipsis,
+                        // Title
+                        Text(
+                          info.title,
+                          style: AppTextStyles.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        // Channel
+                        if (info.channelName != null)
+                          Row(
+                            children: [
+                              Icon(Icons.person_outline_rounded, size: 13, color: AppColors.muted),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  info.channelName!,
+                                  style: AppTextStyles.outfit(fontSize: 12, color: AppColors.muted),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 6),
+                        // Stats
+                        Text(
+                          '${info.entryCount} videos · ${info.formattedTotalDuration}',
+                          style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted),
+                        ),
+                        if (info.modifiedDate != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Updated ${info.modifiedDate}',
+                            style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        _divider(),
+                        const SizedBox(height: 12),
+                        // SETTINGS
+                        Text(
+                          'SETTINGS',
+                          style: AppTextStyles.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.muted,
+                            letterSpacing: 1.1,
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        // Audio / Video toggle
+                        _audioModeToggle(),
+                        const SizedBox(height: 10),
+                        if (_isAudioMode) ...[
+                          _settingsRow('FORMAT', _globalAudioFormat, _audioFormats, (v) {
+                            setState(() => _globalAudioFormat = v);
+                          }),
+                        ] else ...[
+                          _settingsRow('QUALITY', _globalQuality, _qualities, (v) {
+                            setState(() => _globalQuality = v);
+                          }),
+                          const SizedBox(height: 8),
+                          _settingsRow('FORMAT', _globalFormat, _formats, (v) {
+                            setState(() => _globalFormat = v);
+                          }),
+                        ],
+                        const SizedBox(height: 8),
+                        _outputFolderRow(),
+                        const SizedBox(height: 8),
+                        _selectedSizeWidget(),
                       ],
                     ),
-                  const SizedBox(height: 6),
-                  // Stats
-                  Text(
-                    '${info.entryCount} videos · ${info.formattedTotalDuration}',
-                    style: AppTextStyles.outfit(fontSize: 11, color: AppColors.muted),
                   ),
-                  if (info.modifiedDate != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'Updated ${info.modifiedDate}',
-                      style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  _divider(),
-                  const SizedBox(height: 12),
-                  // SETTINGS
-                  Text(
-                    'SETTINGS',
-                    style: AppTextStyles.outfit(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.muted,
-                      letterSpacing: 1.1,
-                    ),
+                ),
+                // Fixed bottom: download action buttons
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _divider(),
+                      const SizedBox(height: 12),
+                      _downloadAllBtn(),
+                      const SizedBox(height: 8),
+                      _queueAllBtn(),
+                      const SizedBox(height: 12),
+                      _copyUrlChip(),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  _settingsRow('QUALITY', _globalQuality, _qualities, (v) {
-                    setState(() => _globalQuality = v);
-                  }),
-                  const SizedBox(height: 8),
-                  _settingsRow('FORMAT', _globalFormat, _formats, (v) {
-                    setState(() => _globalFormat = v);
-                  }),
-                  const SizedBox(height: 8),
-                  _outputFolderRow(),
-                  const Spacer(),
-                  _divider(),
-                  const SizedBox(height: 12),
-                  // ACTION BUTTONS
-                  _downloadAllBtn(),
-                  const SizedBox(height: 8),
-                  _queueAllBtn(),
-                  const SizedBox(height: 12),
-                  _copyUrlChip(),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -347,6 +426,76 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
           AppColors.accent.withOpacity(0.18),
           Colors.transparent,
         ]),
+      ),
+    );
+  }
+
+  Widget _audioModeToggle() {
+    return GestureDetector(
+      onTap: () => setState(() => _isAudioMode = !_isAudioMode),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: _isAudioMode
+                ? AppColors.accent.withOpacity(0.12)
+                : AppColors.surface2,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(
+              color: _isAudioMode
+                  ? AppColors.accent.withOpacity(0.45)
+                  : AppColors.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _isAudioMode ? Icons.music_note_rounded : Icons.videocam_rounded,
+                size: 14,
+                color: _isAudioMode ? AppColors.accent : AppColors.muted,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _isAudioMode ? 'Audio Only' : 'Video',
+                  style: AppTextStyles.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _isAudioMode ? AppColors.accent : AppColors.text,
+                  ),
+                ),
+              ),
+              Container(
+                width: 32,
+                height: 17,
+                decoration: BoxDecoration(
+                  color: _isAudioMode
+                      ? AppColors.accent
+                      : AppColors.border,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 150),
+                  alignment: _isAudioMode
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -421,6 +570,100 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ── Estimated download size ────────────────────────────────────────────────
+
+  String _estimatedTotalSize() {
+    final info = _info;
+    if (info == null || _checkedEntries.isEmpty) return '—';
+
+    // Uses the same Mbps bitrate table as VideoInfo.estimatedSize() so that
+    // per-video estimates are consistent: sizeMb = mbps * durationSeconds / 8
+    double totalMb = 0;
+    for (final e in info.entries) {
+      if (!_checkedEntries.contains(e.id) || !e.isAvailable) continue;
+      final d = e.duration;
+      if (d == null || d == 0) continue;
+
+      final double mbps;
+      if (_isAudioMode) {
+        mbps = switch (_globalAudioFormat.toUpperCase()) {
+          'FLAC' || 'WAV' => 1.411, // CD quality ~1411 kbps
+          'MP3' || 'M4A' => 0.320, // 320 kbps
+          _ => 0.256, // OGG / other
+        };
+      } else {
+        // Use per-row override if set, otherwise global quality
+        final qual = _rowQualityOverrides[e.id] ?? _globalQuality;
+        mbps = switch (qual) {
+          '4K' => 8.0,
+          '1440p' => 4.0,
+          '1080p' => 1.5,
+          '720p' => 0.8,
+          '480p' => 0.4,
+          '360p' => 0.2,
+          // 'Best' — no format data in playlist entries, 1080p is a safe fallback
+          _ => 1.5,
+        };
+      }
+
+      totalMb += mbps * d / 8;
+    }
+
+    if (totalMb == 0) return '—';
+    if (totalMb >= 1024 * 1024) return '~${(totalMb / (1024 * 1024)).toStringAsFixed(1)} TB';
+    if (totalMb >= 1024) return '~${(totalMb / 1024).toStringAsFixed(1)} GB';
+    return '~${totalMb.toStringAsFixed(0)} MB';
+  }
+
+  Widget _selectedSizeWidget() {
+    final size = _estimatedTotalSize();
+    final count = _checkedEntries.length;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.accent.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.data_usage_rounded,
+              size: 13, color: AppColors.accent.withOpacity(0.7)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'EST. DOWNLOAD SIZE',
+                  style: AppTextStyles.outfit(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  size,
+                  style: AppTextStyles.syne(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '$count selected',
+            style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted),
+          ),
+        ],
       ),
     );
   }
@@ -500,6 +743,7 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
       child: GestureDetector(
         onTap: () {
           Clipboard.setData(ClipboardData(text: _info?.webpageUrl ?? widget.url));
+          if (!mounted) return;
           showAppNotification(
             context,
             type: NotificationType.info,
@@ -550,7 +794,7 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
                       onQualityChanged: (q) {
                         setState(() => _rowQualityOverrides[entry.id] = q);
                       },
-                      onDownload: () => _onDownloadOne(entry),
+                      onDownload: () { _onDownloadOne(entry); },
                     );
                   },
                 ),
@@ -690,93 +934,6 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
     );
   }
 
-  // ─── SKELETON ────────────────────────────────────────────────────────
-  Widget _buildSkeleton() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SizedBox(
-          width: 300,
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.surfaceTransparent,
-              border: Border.all(color: AppColors.accent.withOpacity(0.12)),
-              borderRadius: BorderRadius.circular(AppColors.radius),
-            ),
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const AspectRatio(aspectRatio: 16 / 9, child: ShimmerBox(borderRadius: 10)),
-                const SizedBox(height: 14),
-                const ShimmerBox(height: 18),
-                const SizedBox(height: 8),
-                const ShimmerBox(width: 140, height: 14),
-                const SizedBox(height: 6),
-                const ShimmerBox(width: 100, height: 12),
-                const Spacer(),
-                const ShimmerBox(height: 40, borderRadius: 9),
-                const SizedBox(height: 8),
-                const ShimmerBox(height: 36, borderRadius: 9),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Container(width: 1, color: AppColors.border),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const ShimmerBox(height: 40, borderRadius: 9),
-              const SizedBox(height: 8),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: 6,
-                  itemBuilder: (_, __) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Container(
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceTransparent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      padding: const EdgeInsets.all(10),
-                      child: Row(
-                        children: [
-                          const ShimmerBox(width: 18, height: 18, borderRadius: 4),
-                          const SizedBox(width: 8),
-                          const ShimmerBox(width: 24, height: 14),
-                          const SizedBox(width: 10),
-                          const ShimmerBox(width: 120, height: 68, borderRadius: 6),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                ShimmerBox(height: 14),
-                                SizedBox(height: 6),
-                                ShimmerBox(width: 120, height: 11),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const ShimmerBox(width: 60, height: 24, borderRadius: 6),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 // ─── VIDEO ROW ───────────────────────────────────────────────────────────
