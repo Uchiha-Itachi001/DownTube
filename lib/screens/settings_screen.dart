@@ -21,9 +21,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _hasUnsavedChanges = false;
 
   // Pending values for deferred-save settings
-  late int _pendingConcurrent;
   late int _pendingMaxLimit;
+  late int _pendingConcurrentDownloads;
   Color? _pendingThemeColor;
+
+  // Video / Audio pending (applied only when 'Apply Changes' is tapped)
+  late String _pendingQuality;
+  late String _pendingFormat;
+  late String _pendingAudioFormat;
+  late String _pendingBitrate;
+
+  // Notifications pending
+  bool? _pendingNotificationsEnabled;
+
+  // Storage pending
+  String? _pendingDownloadPath;
+
+  // Account pending
+  bool _hasAccountChanges = false;
 
   static const _maxLimitOptions = [10, 25, 50, 100, 200, 500, 1000];
 
@@ -47,9 +62,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     final state = AppState.instance;
-    _pendingConcurrent = state.maxConcurrentDownloads;
     final stored = state.maxDownloadLimit;
     _pendingMaxLimit = _maxLimitOptions.contains(stored) ? stored : 1000;
+    _pendingConcurrentDownloads = state.maxConcurrentDownloads.clamp(1, 6);
+    _pendingQuality = state.defaultQuality;
+    _pendingFormat = state.defaultFormat;
+    _pendingAudioFormat = state.defaultAudioFormat;
+    _pendingBitrate = state.audioBitrate;
+    _pendingNotificationsEnabled = null;
+    _pendingDownloadPath = null;
+    _hasAccountChanges = false;
     _firstNameCtrl = TextEditingController(
       text: AppState.instance.userFirstName ?? '',
     );
@@ -67,18 +89,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: AppState.instance,
-      builder: (context, _) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildNav(),
-            const SizedBox(width: AppColors.gap),
-            Expanded(child: _buildContent()),
-          ],
-        );
-      },
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildNav(),
+        const SizedBox(width: AppColors.gap),
+        Expanded(child: _buildContent()),
+      ],
     );
   }
 
@@ -339,32 +356,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _settingRow(
-          'Auto-download on paste',
-          'Automatically start download when URL is pasted',
-          icon: Icons.content_paste_rounded,
-          trailing: ToggleSwitch(
-            value: state.autoDownload,
-            onChanged: (v) => state.setAutoDownload(v),
-          ),
-        ),
-        _settingRow(
-          'Concurrent Downloads',
-          'Number of files downloading simultaneously (1–6)',
-          icon: Icons.downloading_rounded,
-          trailing: _dropdown(
-            _pendingConcurrent.toString(),
-            ['1', '2', '3', '4', '5', '6'],
-            (v) {
-              setState(() {
-                _pendingConcurrent = int.parse(v);
-                _hasUnsavedChanges =
-                    _pendingConcurrent != state.maxConcurrentDownloads ||
-                    _pendingMaxLimit != state.maxDownloadLimit;
-              });
-            },
-          ),
-        ),
-        _settingRow(
           'Max Download Limit',
           'Maximum number of downloads allowed in the queue (1–1000)',
           icon: Icons.playlist_add_check_rounded,
@@ -374,41 +365,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
             (v) {
               setState(() {
                 _pendingMaxLimit = int.parse(v);
-                _hasUnsavedChanges =
-                    _pendingConcurrent != state.maxConcurrentDownloads ||
-                    _pendingMaxLimit != state.maxDownloadLimit;
+                _hasUnsavedChanges = _pendingMaxLimit != state.maxDownloadLimit;
               });
             },
           ),
         ),
         _settingRow(
-          'Embed Subtitles',
-          'Automatically embed available subtitles',
-          icon: Icons.subtitles_rounded,
-          trailing: ToggleSwitch(
-            value: state.embedSubs,
-            onChanged: (v) => state.setEmbedSubs(v),
-          ),
+          'Concurrent Downloads',
+          'How many videos download simultaneously (1–6)',
+          icon: Icons.download_for_offline_rounded,
+          trailing: _concurrentSelector(),
         ),
         _settingRow(
           'Save Thumbnail',
-          'Download and embed video thumbnail',
+          'Thumbnail is always saved and embedded',
           icon: Icons.image_rounded,
-          trailing: ToggleSwitch(
-            value: state.saveThumbnail,
-            onChanged: (v) => state.setSaveThumbnail(v),
+          trailing: Tooltip(
+            message: 'Always enabled',
+            child: MouseRegion(
+              cursor: SystemMouseCursors.forbidden,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.accent.withOpacity(0.7)),
+                  const SizedBox(width: 6),
+                  IgnorePointer(
+                    child: ToggleSwitch(value: true, onChanged: null),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        _settingRow(
-          'Add Chapters',
-          'Include chapter markers in download',
-          icon: Icons.bookmark_border_rounded,
-          trailing: ToggleSwitch(
-            value: state.addChapters,
-            onChanged: (v) => state.setAddChapters(v),
-          ),
-        ),
-        if (_hasUnsavedChanges) ...[
+        if (_hasUnsavedChanges || _pendingConcurrentDownloads != AppState.instance.maxConcurrentDownloads) ...[
           const SizedBox(height: 12),
           _applyButton(),
         ],
@@ -422,8 +411,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: GestureDetector(
         onTap: () async {
           final state = AppState.instance;
-          await state.setConcurrentDownloads(_pendingConcurrent);
           await state.setMaxDownloadLimit(_pendingMaxLimit);
+          await state.setConcurrentDownloads(_pendingConcurrentDownloads);
           setState(() => _hasUnsavedChanges = false);
           widget.onReload?.call();
           if (mounted) {
@@ -466,54 +455,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _sectionReloadButton() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: GestureDetector(
-        onTap: () {
-          widget.onReload?.call();
-          if (mounted) {
-            showAppNotification(
-              context,
-              type: NotificationType.success,
-              message: 'Settings applied',
-              duration: const Duration(seconds: 2),
-            );
-          }
-        },
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.accent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.check_rounded, size: 16, color: Colors.black),
-                const SizedBox(width: 8),
-                Text(
-                  'Apply Changes',
-                  style: AppTextStyles.outfit(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   // --- VIDEO ---------------------------------------------------------------
 
   Widget _videoSection() {
     final state = AppState.instance;
+    final hasChanges = _pendingQuality != state.defaultQuality ||
+        _pendingFormat != state.defaultFormat;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -521,27 +468,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Default Quality',
           'Applied automatically when analyzing a video',
           icon: Icons.high_quality_rounded,
-          trailing: _dropdown(state.defaultQuality, [
+          trailing: _dropdown(_pendingQuality, [
             'Best',
             '4K',
             '1080p',
             '720p',
             '480p',
             '360p',
-          ], (v) => state.setDefaultQuality(v)),
+          ], (v) => setState(() => _pendingQuality = v)),
         ),
         _settingRow(
           'Default Format',
           'Applied automatically to every download',
           icon: Icons.video_file_rounded,
-          trailing: _dropdown(state.defaultFormat, [
+          trailing: _dropdown(_pendingFormat, [
             'MP4',
             'MKV',
             'WEBM',
-          ], (v) => state.setDefaultFormat(v)),
+          ], (v) => setState(() => _pendingFormat = v)),
         ),
-        const SizedBox(height: 12),
-        _sectionReloadButton(),
+        if (hasChanges) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () async {
+                final state = AppState.instance;
+                await state.setDefaultQuality(_pendingQuality);
+                await state.setDefaultFormat(_pendingFormat);
+                widget.onReload?.call();
+                if (mounted) {
+                  showAppNotification(
+                    context,
+                    type: NotificationType.success,
+                    message: 'Video settings applied',
+                    duration: const Duration(seconds: 2),
+                  );
+                }
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.save_rounded,
+                          size: 16, color: Colors.black),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Apply Changes',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -550,6 +544,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _audioSection() {
     final state = AppState.instance;
+    final hasChanges = _pendingAudioFormat != state.defaultAudioFormat ||
+        _pendingBitrate != state.audioBitrate;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -557,27 +553,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Audio Format',
           'Applied automatically for audio downloads',
           icon: Icons.audio_file_rounded,
-          trailing: _dropdown(state.defaultAudioFormat, [
+          trailing: _dropdown(_pendingAudioFormat, [
             'MP3',
             'FLAC',
             'WAV',
             'AAC',
             'OGG',
-          ], (v) => state.setDefaultAudioFormat(v)),
+          ], (v) => setState(() => _pendingAudioFormat = v)),
         ),
         _settingRow(
           'Bitrate',
           'Audio quality bitrate',
           icon: Icons.graphic_eq_rounded,
-          trailing: _dropdown(state.audioBitrate, [
+          trailing: _dropdown(_pendingBitrate, [
             '128 kbps',
             '192 kbps',
             '256 kbps',
             '320 kbps',
-          ], (v) => state.setAudioBitrate(v)),
+          ], (v) => setState(() => _pendingBitrate = v)),
         ),
-        const SizedBox(height: 12),
-        _sectionReloadButton(),
+        if (hasChanges) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () async {
+                final state = AppState.instance;
+                await state.setDefaultAudioFormat(_pendingAudioFormat);
+                await state.setAudioBitrate(_pendingBitrate);
+                widget.onReload?.call();
+                if (mounted) {
+                  showAppNotification(
+                    context,
+                    type: NotificationType.success,
+                    message: 'Audio settings applied',
+                    duration: const Duration(seconds: 2),
+                  );
+                }
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.save_rounded,
+                          size: 16, color: Colors.black),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Apply Changes',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -585,6 +628,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // --- STORAGE -------------------------------------------------------------
 
   Widget _storageSection() {
+    final savedPath = AppState.instance.downloadPath;
+    final hasPending = _pendingDownloadPath != null &&
+        _pendingDownloadPath != savedPath;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -596,8 +642,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 12),
         _buildStorageBreakdown(),
-        const SizedBox(height: 12),
-        _sectionReloadButton(),
+        if (hasPending) ...[          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () async {
+                await AppState.instance.setDownloadPath(_pendingDownloadPath!);
+                setState(() => _pendingDownloadPath = null);
+                if (mounted) {
+                  showAppNotification(
+                    context,
+                    type: NotificationType.success,
+                    message: 'Download location updated',
+                    duration: const Duration(seconds: 2),
+                  );
+                }
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.save_rounded, size: 16, color: Colors.black),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Apply Changes',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -708,6 +796,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _notificationsSection() {
     final state = AppState.instance;
+    final displayValue = _pendingNotificationsEnabled ?? state.notificationsEnabled;
+    final hasPending = _pendingNotificationsEnabled != null &&
+        _pendingNotificationsEnabled != state.notificationsEnabled;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -716,21 +807,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Show system notifications when downloads complete',
           icon: Icons.notifications_active_rounded,
           trailing: ToggleSwitch(
-            value: state.notificationsEnabled,
-            onChanged: (v) => state.setNotificationsEnabled(v),
+            value: displayValue,
+            onChanged: (v) => setState(() => _pendingNotificationsEnabled = v),
           ),
         ),
-        _settingRow(
-          'Sound Effects',
-          'Play sound when download completes',
-          icon: Icons.volume_up_rounded,
-          trailing: ToggleSwitch(
-            value: state.soundEffects,
-            onChanged: (v) => state.setSoundEffects(v),
+        if (hasPending) ...[          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () async {
+                await state.setNotificationsEnabled(_pendingNotificationsEnabled!);
+                setState(() => _pendingNotificationsEnabled = null);
+                if (mounted) {
+                  showAppNotification(
+                    context,
+                    type: NotificationType.success,
+                    message: 'Notification settings applied',
+                    duration: const Duration(seconds: 2),
+                  );
+                }
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.save_rounded, size: 16, color: Colors.black),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Apply Changes',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        _sectionReloadButton(),
+        ],
       ],
     );
   }
@@ -968,10 +1092,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           trailing: _textInput(
             _firstNameCtrl,
             onChanged: (v) {
-              AppState.instance.setUserProfile(
-                firstName: v,
-                lastName: _lastNameCtrl.text,
-              );
+              final s = AppState.instance;
+              setState(() {
+                _hasAccountChanges =
+                    v != (s.userFirstName ?? '') ||
+                    _lastNameCtrl.text != (s.userLastName ?? '');
+              });
             },
           ),
         ),
@@ -982,13 +1108,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
           trailing: _textInput(
             _lastNameCtrl,
             onChanged: (v) {
-              AppState.instance.setUserProfile(
-                firstName: _firstNameCtrl.text,
-                lastName: v,
-              );
+              final s = AppState.instance;
+              setState(() {
+                _hasAccountChanges =
+                    _firstNameCtrl.text != (s.userFirstName ?? '') ||
+                    v != (s.userLastName ?? '');
+              });
             },
           ),
         ),
+        if (_hasAccountChanges) ...[          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () async {
+                await AppState.instance.setUserProfile(
+                  firstName: _firstNameCtrl.text,
+                  lastName: _lastNameCtrl.text,
+                );
+                setState(() => _hasAccountChanges = false);
+                if (mounted) {
+                  showAppNotification(
+                    context,
+                    type: NotificationType.success,
+                    message: 'Profile updated',
+                    duration: const Duration(seconds: 2),
+                  );
+                }
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.save_rounded, size: 16, color: Colors.black),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Apply Changes',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1132,11 +1307,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         _settingRow(
           'Auto-update yt-dlp',
-          'Keep yt-dlp engine updated automatically',
+          'Engine updates automatically to stay current',
           icon: Icons.system_update_rounded,
-          trailing: ToggleSwitch(
-            value: state.autoUpdateYtDlp,
-            onChanged: (v) => state.setAutoUpdateYtDlp(v),
+          trailing: Tooltip(
+            message: 'Always enabled',
+            child: MouseRegion(
+              cursor: SystemMouseCursors.forbidden,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.accent.withOpacity(0.7)),
+                  const SizedBox(width: 6),
+                  IgnorePointer(
+                    child: ToggleSwitch(value: true, onChanged: null),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Copyright
+        Center(
+          child: Text(
+            '\u00a9 2025 Pankaj Roy (Uchiha-Itachi001). All rights reserved.',
+            style: AppTextStyles.outfit(
+              fontSize: 11,
+              color: AppColors.muted,
+            ),
+            textAlign: TextAlign.center,
           ),
         ),
       ],
@@ -1214,6 +1413,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onConfirm: () async {
                   Navigator.of(context).pop();
                   await AppState.instance.resetAllSettings();
+                  widget.onReload?.call();
                   if (context.mounted) {
                     showAppNotification(
                       context,
@@ -1477,35 +1677,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (safeValue != value) {
       WidgetsBinding.instance.addPostFrameCallback((_) => onChanged(safeValue));
     }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      height: 32,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceTransparent2,
-        border: Border.all(color: AppColors.accent.withOpacity(0.20)),
-        borderRadius: BorderRadius.circular(8),
+    return PopupMenuButton<String>(
+      initialValue: safeValue,
+      color: const Color(0xFF1C1C22),
+      elevation: 12,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: AppColors.accent.withOpacity(0.22)),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: safeValue,
-          dropdownColor: AppColors.surface2,
-          style: AppTextStyles.outfit(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-          icon: const Icon(
-            Icons.arrow_drop_down_rounded,
-            size: 18,
-            color: AppColors.muted,
-          ),
-          items: items
-              .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-              .toList(),
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
+      constraints: const BoxConstraints(minWidth: 140),
+      offset: const Offset(0, 38),
+      onSelected: onChanged,
+      itemBuilder: (context) => items
+          .map(
+            (v) => PopupMenuItem<String>(
+              value: v,
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    child: v == safeValue
+                        ? Icon(Icons.check_rounded,
+                            size: 13, color: AppColors.accent)
+                        : null,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    v,
+                    style: AppTextStyles.outfit(
+                      fontSize: 12,
+                      fontWeight: v == safeValue
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: v == safeValue ? AppColors.accent : AppColors.text,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        height: 32,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceTransparent2,
+          border: Border.all(color: AppColors.accent.withOpacity(0.25)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              safeValue,
+              style: AppTextStyles.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.text,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 16,
+              color: AppColors.accent.withOpacity(0.7),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _concurrentSelector() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(6, (i) {
+        final n = i + 1;
+        final active = _pendingConcurrentDownloads == n;
+        return Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: GestureDetector(
+            onTap: () => setState(() => _pendingConcurrentDownloads = n),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: active ? AppColors.accent : AppColors.surfaceTransparent2,
+                  border: Border.all(
+                    color: active ? AppColors.accent : AppColors.accent.withOpacity(0.25),
+                  ),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Center(
+                  child: Text(
+                    '$n',
+                    style: AppTextStyles.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: active ? Colors.black : AppColors.text,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
     );
   }
 
@@ -1545,14 +1827,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _pathInput() {
-    final currentPath = AppState.instance.downloadPath ?? 'Not set';
+    final displayPath = _pendingDownloadPath ?? AppState.instance.downloadPath ?? 'Not set';
+    final isPending = _pendingDownloadPath != null && _pendingDownloadPath != AppState.instance.downloadPath;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () async {
           final picked = await FilePicker.platform.getDirectoryPath();
           if (picked != null) {
-            await AppState.instance.setDownloadPath(picked);
+            setState(() => _pendingDownloadPath = picked);
           }
         },
         child: Container(
@@ -1568,14 +1851,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               Expanded(
                 child: Text(
-                  currentPath,
+                  displayPath,
                   style: AppTextStyles.outfit(
                     fontSize: 12,
-                    color: AppColors.accent.withOpacity(0.7),
+                    color: isPending
+                        ? AppColors.accent
+                        : AppColors.accent.withOpacity(0.7),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (isPending)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(Icons.edit_rounded, size: 12, color: AppColors.accent),
+                ),
               Icon(
                 Icons.folder_open_rounded,
                 size: 16,

@@ -27,17 +27,17 @@ DownTube is a native **Windows desktop application** that wraps [yt-dlp](https:/
 <tr>
 <td width="50%">
 
-**🎬 Video Downloads**
+**Video Downloads**
 - Individual videos and full playlists
 - Quality tiers: Best, 4K, 1440p, 1080p, 720p, 480p, 360p
 - Container formats: MP4, MKV, WEBM
 
-**🎵 Audio Extraction**
+**Audio Extraction**
 - Rip audio from any supported URL
 - Formats: MP3, M4A, FLAC, WAV, OGG
 - Global or per-item audio mode in playlists
 
-**📋 Playlist Management**
+**Playlist Management**
 - Entries stream in progressively — no waiting for full fetch
 - Per-video quality override in the right panel
 - Estimated total download size shown in real time
@@ -46,18 +46,18 @@ DownTube is a native **Windows desktop application** that wraps [yt-dlp](https:/
 </td>
 <td width="50%">
 
-**⬇️ Download Queue**
+**Download Queue**
 - Configurable concurrent download limit
 - Pause, resume, and cancel at any time
 - Live progress: speed, ETA, and phase (video / audio / merge)
 - Per-item speed sparkline chart
 
-**📚 Library & History**
+**Library & History**
 - Persistent history backed by SQLite
 - Card-based library view with quick re-download
 - Automatic index suffix prevents filename conflicts
 
-**⚙️ Application**
+**Application**
 - Custom accent colour, persists across sessions
 - Developer profile screen with contribution graph
 - Auto-detects yt-dlp from PATH or `%APPDATA%\DownTube`
