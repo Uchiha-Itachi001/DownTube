@@ -1,3 +1,4 @@
+// © 2025 Pankaj Roy (Uchiha-Itachi001). All rights reserved.
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -5,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 import 'core/app_colors.dart';
 import 'core/app_theme.dart';
 import 'providers/app_state.dart';
+import 'services/notification_service.dart';
 import 'startup/splash_screen.dart';
 
 void main() async {
@@ -16,6 +18,7 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
   }
   await windowManager.ensureInitialized();
+  await NotificationService.init();
 
   const minSize = Size(800, 600);
 

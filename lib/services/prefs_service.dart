@@ -116,7 +116,7 @@ class PrefsService {
 
   // Concurrent / limit
   int get concurrentDownloads =>
-      _prefs.getInt(_keyConcurrentDownloads) ?? 4;
+      _prefs.getInt(_keyConcurrentDownloads) ?? 6;
   Future<void> setConcurrentDownloads(int v) =>
       _prefs.setInt(_keyConcurrentDownloads, v);
 

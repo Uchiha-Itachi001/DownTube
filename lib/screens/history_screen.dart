@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
@@ -9,7 +9,9 @@ import '../widgets/section_card.dart';
 import '../widgets/stat_tile.dart';
 import '../widgets/app_notification.dart';
 
-enum _HistoryDateFilter { today, week, all }
+enum _HistoryDateFilter { week, all }
+
+enum _HistoryStatusFilter { all, done, error }
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -20,28 +22,38 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   _HistoryDateFilter _filter = _HistoryDateFilter.all;
+  _HistoryStatusFilter _statusFilter = _HistoryStatusFilter.all;
   DateTime? _pickedDate;
 
   // ---- filter helpers ----
 
   List<DownloadItem> _applyFilter(List<DownloadItem> all) {
+    // 1. Date filter
+    List<DownloadItem> result;
     if (_pickedDate != null) {
-      return all.where((d) {
+      result = all.where((d) {
         final dDay =
             DateTime(d.createdAt.year, d.createdAt.month, d.createdAt.day);
         return dDay == _pickedDate;
       }).toList();
+    } else {
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      result = switch (_filter) {
+        _HistoryDateFilter.week => all
+            .where((d) => d.createdAt
+                .isAfter(todayStart.subtract(const Duration(days: 7))))
+            .toList(),
+        _HistoryDateFilter.all => all,
+      };
     }
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    return switch (_filter) {
-      _HistoryDateFilter.today =>
-        all.where((d) => d.createdAt.isAfter(todayStart)).toList(),
-      _HistoryDateFilter.week => all
-          .where((d) => d.createdAt
-              .isAfter(todayStart.subtract(const Duration(days: 7))))
-          .toList(),
-      _HistoryDateFilter.all => all,
+    // 2. Status filter
+    return switch (_statusFilter) {
+      _HistoryStatusFilter.done =>
+        result.where((d) => d.status == DownloadStatus.done).toList(),
+      _HistoryStatusFilter.error =>
+        result.where((d) => d.status == DownloadStatus.error).toList(),
+      _HistoryStatusFilter.all => result,
     };
   }
 
@@ -194,16 +206,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               ),
               const Spacer(),
-              _ClearAllButton(hasHistory: allHistory.isNotEmpty),
+              _ClearAllButton(hasHistory: allHistory.isNotEmpty, items: filtered),
             ],
           ),
           const SizedBox(height: 10),
           // Filter row
           Row(
             children: [
-              // Preset pills
+              // Date preset pills
               for (final (label, val) in [
-                ('Today', _HistoryDateFilter.today),
                 ('This Week', _HistoryDateFilter.week),
                 ('All Time', _HistoryDateFilter.all),
               ])
@@ -225,6 +236,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 onTap: () => _pickDate(context),
                 onClear: () => setState(() => _pickedDate = null),
               ),
+              const Spacer(),
+              // Status filter pills
+              for (final (label, val, color) in [
+                ('All', _HistoryStatusFilter.all, AppColors.accent),
+                ('Done', _HistoryStatusFilter.done, AppColors.accent),
+                (
+                  'Error',
+                  _HistoryStatusFilter.error,
+                  AppColors.red,
+                ),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: _FilterPill(
+                    label: label,
+                    isActive: _statusFilter == val,
+                    activeColor: color,
+                    onTap: () => setState(() => _statusFilter = val),
+                  ),
+                ),
             ],
           ),
         ],
@@ -554,11 +585,16 @@ class _FilterPill extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
+  final Color? activeColor;
   const _FilterPill(
-      {required this.label, required this.isActive, required this.onTap});
+      {required this.label,
+      required this.isActive,
+      required this.onTap,
+      this.activeColor});
 
   @override
   Widget build(BuildContext context) {
+    final color = activeColor ?? AppColors.accent;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -566,10 +602,10 @@ class _FilterPill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: isActive ? AppColors.accent.withOpacity(0.14) : Colors.transparent,
+            color: isActive ? color.withOpacity(0.14) : Colors.transparent,
             border: Border.all(
               color: isActive
-                  ? AppColors.accent.withOpacity(0.4)
+                  ? color.withOpacity(0.4)
                   : AppColors.accent.withOpacity(0.20),
             ),
             borderRadius: BorderRadius.circular(7),
@@ -579,7 +615,7 @@ class _FilterPill extends StatelessWidget {
             style: AppTextStyles.outfit(
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              color: isActive ? AppColors.accent : AppColors.muted,
+              color: isActive ? color : AppColors.muted,
             ),
           ),
         ),
@@ -678,7 +714,8 @@ class _DatePickerBtn extends StatelessWidget {
 
 class _ClearAllButton extends StatefulWidget {
   final bool hasHistory;
-  const _ClearAllButton({required this.hasHistory});
+  final List<DownloadItem> items;
+  const _ClearAllButton({required this.hasHistory, required this.items});
 
   @override
   State<_ClearAllButton> createState() => _ClearAllButtonState();
@@ -688,6 +725,7 @@ class _ClearAllButtonState extends State<_ClearAllButton> {
   bool _hovered = false;
 
   Future<void> _onClearAll() async {
+    final count = widget.items.length;
     final ok = await showDialog<bool>(
       context: context,
       barrierColor: Colors.black.withOpacity(0.6),
@@ -720,14 +758,14 @@ class _ClearAllButtonState extends State<_ClearAllButton> {
                     child: const Icon(Icons.delete_sweep_rounded, size: 18, color: AppColors.red),
                   ),
                   const SizedBox(width: 12),
-                  Text('Clear All History',
+                  Text('Clear History',
                       style: AppTextStyles.outfit(
                           fontSize: 15, fontWeight: FontWeight.w700)),
                 ],
               ),
               const SizedBox(height: 16),
               Text(
-                'Remove all completed and failed downloads from history?\n\nThis will permanently delete all downloaded files from your device.',
+                'Remove $count item${count == 1 ? '' : 's'} from history?\n\nThis will permanently delete the associated files from your device.',
                 style: AppTextStyles.outfit(fontSize: 13, color: AppColors.muted, height: 1.5),
               ),
               const SizedBox(height: 24),
@@ -749,7 +787,7 @@ class _ClearAllButtonState extends State<_ClearAllButton> {
                           borderRadius: BorderRadius.circular(8)),
                     ),
                     onPressed: () => Navigator.pop(ctx, true),
-                    child: Text('Clear All',
+                    child: Text('Clear',
                         style: AppTextStyles.outfit(
                             fontSize: 13, fontWeight: FontWeight.w600)),
                   ),
@@ -761,12 +799,14 @@ class _ClearAllButtonState extends State<_ClearAllButton> {
       ),
     );
     if (ok == true) {
-      await AppState.instance.clearHistory();
+      for (final item in widget.items) {
+        await AppState.instance.permanentlyDelete(item.id);
+      }
       if (context.mounted) {
         showAppNotification(
           context,
           type: NotificationType.success,
-          message: 'Download history cleared',
+          message: '$count item${count == 1 ? '' : 's'} cleared from history',
           duration: const Duration(seconds: 3),
         );
       }
@@ -884,7 +924,7 @@ class _HistoryTileState extends State<_HistoryTile> {
               ),
               const SizedBox(height: 14),
               Text(
-                'Delete "${widget.item.title}"?\n\nThis will remove it from history . But the file on disk is not affected',
+                'Delete "${widget.item.title}"?\n\nThis will remove it from history and permanently delete the file from your device.',
                 style: AppTextStyles.outfit(
                     fontSize: 13, color: AppColors.muted, height: 1.5),
               ),
@@ -966,18 +1006,45 @@ class _HistoryTileState extends State<_HistoryTile> {
               ),
             ),
             // Thumbnail 
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: SizedBox(
-                width: 72,
-                height: 44,
-                child: item.thumbnailUrl != null
-                    ? Image.network(
-                        item.thumbnailUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _fallbackThumb(accent, isAudio),
-                      )
-                    : _fallbackThumb(accent, isAudio),
+            SizedBox(
+              width: 72,
+              height: 44,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: item.thumbnailUrl != null
+                          ? Image.network(
+                              item.thumbnailUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _fallbackThumb(accent, isAudio),
+                            )
+                          : _fallbackThumb(accent, isAudio),
+                    ),
+                  ),
+                  if (_hovered && !success)
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          color: Colors.black.withOpacity(0.82),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.refresh_rounded, color: AppColors.red, size: 14),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Use single\nvideo URL',
+                                style: AppTextStyles.outfit(fontSize: 8, color: Colors.white),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(width: 12),

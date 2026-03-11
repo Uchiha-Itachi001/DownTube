@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -220,7 +220,7 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
-          // DT circle
+          // Icon image
           Container(
             width: 68,
             height: 68,
@@ -232,13 +232,12 @@ class _SplashScreenState extends State<SplashScreen>
                 width: 2,
               ),
             ),
-            child: Center(
-              child: Text(
-                'DT',
-                style: AppTextStyles.syne(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.accent,
+            child: ClipOval(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Image.asset(
+                  'assetes/images/icon.png',
+                  fit: BoxFit.contain,
                 ),
               ),
             ),

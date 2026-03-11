@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
@@ -584,7 +584,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                 borderRadius: BorderRadius.vertical(
                   top: Radius.circular(AppColors.radius - 1),
                 ),
-                child: _buildThumbnail(item, accent),
+                child: _buildThumbnail(item, accent, _hovered),
               ),
             ),
             // Info
@@ -687,7 +687,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                           const SizedBox(width: 3),
                           Flexible(
                             child: Text(
-                              item.fileSize!,
+                              formatFileSize(item.fileSize),
                               overflow: TextOverflow.ellipsis,
                               style: AppTextStyles.outfit(
                                 fontSize: 10,
@@ -737,8 +737,8 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
           ],
         ),
       ),
-      ),
-    );
+    ),
+  );
   }
 
   void _openFile(DownloadItem item) {
@@ -747,7 +747,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
     Process.run('cmd', ['/c', 'start', '', path]);
   }
 
-  Widget _buildThumbnail(DownloadItem item, Color accent) {
+  Widget _buildThumbnail(DownloadItem item, Color accent, bool hovered) {
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -845,6 +845,42 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
             ),
           ),
         ),
+        // Error hover overlay
+        if (hovered && item.status == DownloadStatus.error)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.82),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppColors.radius - 1),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.refresh_rounded, color: AppColors.red, size: 24),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Download failed',
+                    style: AppTextStyles.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Try a single video URL',
+                    style: AppTextStyles.outfit(
+                      fontSize: 10,
+                      color: AppColors.muted,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -861,57 +897,6 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
       ),
     ),
   );
-}
-
-// Quality badge
-class _QualityBadge extends StatelessWidget {
-  final String resolution;
-  final String format;
-  const _QualityBadge({required this.resolution, required this.format});
-
-  @override
-  Widget build(BuildContext context) {
-    final isAudio = resolution.endsWith('k');
-    final color = isAudio ? const Color(0xFF3B82F6) : AppColors.accent;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: color.withOpacity(0.35)),
-          ),
-          child: Text(
-            resolution,
-            style: AppTextStyles.outfit(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ),
-        const SizedBox(width: 5),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Text(
-            format.toUpperCase(),
-            style: AppTextStyles.outfit(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: AppColors.muted,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 // Action button with hover effect

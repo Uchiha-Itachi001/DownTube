@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
@@ -209,26 +209,17 @@ class _AppHeaderState extends State<AppHeader> {
                   ),
           ),
           const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                state.userDisplayName,
-                style: AppTextStyles.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+          SizedBox(
+            width: 80,
+            child: Text(
+              state.userDisplayName,
+              style: AppTextStyles.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
               ),
-              Text(
-                'PREMIUM',
-                style: AppTextStyles.outfit(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.accent,
-                ),
-              ),
-            ],
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           ),
         ],
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import '../providers/app_state.dart';
+import '../services/notification_service.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/app_header.dart';
 import '../widgets/app_notification.dart';
@@ -10,6 +11,7 @@ import '../screens/downloads_screen.dart';
 import '../screens/library_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/developer_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -75,6 +77,7 @@ class _AppShellState extends State<AppShell>
   void _drainNotifications() {
     final notifs = AppState.instance.drainNotifications();
     if (notifs.isEmpty) return;
+    final notificationsEnabled = AppState.instance.notificationsEnabled;
     for (final n in notifs) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -82,6 +85,7 @@ class _AppShellState extends State<AppShell>
           DownloadNotifType.videoPhase => (NotificationType.info, null),
           DownloadNotifType.audioPhase => (NotificationType.info, null),
           DownloadNotifType.mergeDone => (NotificationType.success, null),
+          DownloadNotifType.downloadError => (NotificationType.error, null),
         };
         showAppNotification(
           context,
@@ -90,12 +94,25 @@ class _AppShellState extends State<AppShell>
           subtitle: n.subtitle,
           duration: const Duration(seconds: 3),
         );
+        // Windows native toast
+        if (notificationsEnabled) {
+          switch (n.type) {
+            case DownloadNotifType.mergeDone:
+              NotificationService.notifyDone(n.subtitle ?? n.message);
+            case DownloadNotifType.downloadError:
+              NotificationService.notifyError(
+                  n.subtitle ?? n.message,
+                  reason: n.subtitle != null ? n.message : null);
+            default:
+              break;
+          }
+        }
       });
     }
   }
 
   Widget _buildNonAnalyzeScreen() {
-    switch (_selectedIndex < 5 ? _selectedIndex : 0) {
+    switch (_selectedIndex == 5 ? 0 : _selectedIndex) {
       case 0:
         return DashboardScreen(onAnalyze: _goToAnalyzed);
       case 1:
@@ -106,6 +123,8 @@ class _AppShellState extends State<AppShell>
         return const HistoryScreen();
       case 4:
         return SettingsScreen(onReload: _onRefresh);
+      case 6:
+        return const DeveloperScreen();
       default:
         return DashboardScreen(onAnalyze: _goToAnalyzed);
     }
@@ -257,7 +276,7 @@ class _AppShellState extends State<AppShell>
                                       )
                                     : KeyedSubtree(
                                         key: ValueKey(
-                                          'nav-${_selectedIndex < 5 ? _selectedIndex : 0}-$_screenRefreshKey',
+                                          'nav-${_selectedIndex == 5 ? 0 : _selectedIndex}-$_screenRefreshKey',
                                         ),
                                         child: _buildNonAnalyzeScreen(),
                                       ),
@@ -352,45 +371,35 @@ class _LogoBox extends StatelessWidget {
         child:
             collapsed
                 ? Center(
-                  child: Container(
+                  child: SizedBox(
                     width: 32,
                     height: 32,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(9),
-                      boxShadow: [
-                        BoxShadow(color: AppColors.accentGlow, blurRadius: 16),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.black,
-                      size: 18,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        'assetes/images/icon.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 )
                 : Row(
                   children: [
-                    Container(
+                    SizedBox(
                       width: 32,
                       height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(9),
-                        boxShadow: [
-                          BoxShadow(color: AppColors.accentGlow, blurRadius: 16),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.check,
-                        color: Colors.black,
-                        size: 18,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.asset(
+                          'assetes/images/icon.png',
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Flexible(
                       child: Text(
-                        'TubeDown',
+                        'DownTube',
                         style: const TextStyle(
                           fontFamily: 'Syne',
                           fontWeight: FontWeight.w800,
@@ -398,26 +407,6 @@ class _LogoBox extends StatelessWidget {
                           color: AppColors.text,
                         ),
                         overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'PRO',
-                        style: TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                          letterSpacing: 0.5,
-                        ),
                       ),
                     ),
                   ],

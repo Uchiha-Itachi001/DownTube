@@ -1,4 +1,4 @@
-﻿import 'dart:math' as math;
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/app_colors.dart';
@@ -196,11 +196,17 @@ class DashboardScreen extends StatelessWidget {
           // Facebook
           _platformFaIcon(FontAwesomeIcons.facebook, const Color(0xFF1877F2)),
           // Instagram
-          _platformFaIcon(
-            FontAwesomeIcons.instagram,const  Color(0xFFE1306C) 
-          ),
-
-
+          _platformFaIcon(FontAwesomeIcons.instagram, const Color(0xFFE1306C)),
+          // X / Twitter
+          _platformFaIcon(FontAwesomeIcons.xTwitter, const Color(0xFFE7E9EA)),
+          // TikTok
+          _platformFaIcon(FontAwesomeIcons.tiktok, const Color(0xFF69C9D0)),
+          // Twitch
+          _platformFaIcon(FontAwesomeIcons.twitch, const Color(0xFF9146FF)),
+          // SoundCloud
+          _platformFaIcon(FontAwesomeIcons.soundcloud, const Color(0xFFFF5500)),
+          // Reddit
+          _platformFaIcon(FontAwesomeIcons.reddit, const Color(0xFFFF4500)),
           const Spacer(),
           Text(
             '1000+ platforms',

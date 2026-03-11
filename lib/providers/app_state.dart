@@ -14,7 +14,7 @@ enum FetchState { idle, loading, success, error }
 enum PlaylistFetchState { idle, loadingEntries, success, error }
 
 // Phase notifications (consumed by UI to show overlay cards)
-enum DownloadNotifType { videoPhase, audioPhase, mergeDone }
+enum DownloadNotifType { videoPhase, audioPhase, mergeDone, downloadError }
 
 class DownloadNotification {
   final String message;
@@ -132,7 +132,7 @@ class AppState extends ChangeNotifier {
 
   // Downloads
   final List<DownloadItem> downloads = [];
-  int maxConcurrentDownloads = 4;
+  int maxConcurrentDownloads = 6;
   int maxDownloadLimit = 1000;
   int _activeDownloadCount = 0;
   final List<DownloadItem> _downloadQueue = [];
@@ -531,6 +531,11 @@ class AppState extends ChangeNotifier {
       item.filePath = ''; // never store path for failed downloads
       await DownloadDb.removeActive(item.id);
       await DownloadDb.save(item);
+      pendingNotifications.add(DownloadNotification(
+        message: 'Download failed',
+        subtitle: item.title,
+        type: DownloadNotifType.downloadError,
+      ));
     }
     _onDownloadFinished();
     notifyListeners();

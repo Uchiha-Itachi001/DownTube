@@ -43,3 +43,24 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Private assets (developer photo, personal images)
+assetes/images/Dev_Img.png
+assetes/images/profile_*.png
+
+# Environment & secrets
+.env
+*.env
+.env.*
+local.properties
+
+# Installer build outputs
+installers/*.exe
+installers/Output/
+
+# Python utility scripts
+fix_encoding.py
+truncate_file.py
+
+# Windows build ephemeral
+windows/flutter/ephemeral/

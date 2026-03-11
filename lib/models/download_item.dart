@@ -5,6 +5,31 @@ enum DownloadStatus { queued, downloading, done, error, paused }
 /// Which phase of a multi-stream yt-dlp download we are in.
 enum DownloadPhase { video, audio, merging, complete }
 
+/// Converts a yt-dlp file-size string (e.g. "383.84MiB", "500 KiB")
+/// to a human-readable string using SI decimal labels (KB, MB, GB)
+/// and auto-scales: values ≥ 1000 are promoted to the next unit.
+String formatFileSize(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return '—';
+  final m = RegExp(r'([\d.]+)\s*(T|G|M|K)?i?B', caseSensitive: false)
+      .firstMatch(raw.trim());
+  if (m == null) return raw;
+  final val = double.tryParse(m.group(1)!) ?? 0;
+  final unit = (m.group(2) ?? '').toUpperCase();
+  // yt-dlp reports IEC sizes (1 MiB = 1024² bytes); convert to bytes
+  final bytes = switch (unit) {
+    'T' => val * 1024 * 1024 * 1024 * 1024,
+    'G' => val * 1024 * 1024 * 1024,
+    'M' => val * 1024 * 1024,
+    'K' => val * 1024,
+    _   => val,
+  };
+  // Display with SI decimal labels
+  if (bytes >= 1e9) return '${(bytes / 1e9).toStringAsFixed(2)} GB';
+  if (bytes >= 1e6) return '${(bytes / 1e6).toStringAsFixed(2)} MB';
+  if (bytes >= 1e3) return '${(bytes / 1e3).toStringAsFixed(0)} KB';
+  return '${bytes.round()} B';
+}
+
 class DownloadItem {
   final String id;
   final String title;

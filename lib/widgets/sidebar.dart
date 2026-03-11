@@ -160,6 +160,13 @@ class Sidebar extends StatelessWidget {
                               onTap: () => onItemSelected(4),
                               collapsed: collapsed,
                             ),
+                            _NavItem(
+                              icon: Icons.person_pin_rounded,
+                              label: 'Credits',
+                              isActive: selectedIndex == 6,
+                              onTap: () => onItemSelected(6),
+                              collapsed: collapsed,
+                            ),
                           ],
                         ),
                       ),

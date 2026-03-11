@@ -382,7 +382,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   title: item.title,
                   meta: '${item.resolution} · ${item.format}',
                   duration: item.formattedDuration,
-                  size: item.fileSize ?? '—',
+                  size: formatFileSize(item.fileSize),
                   isAudio: isAudio,
                   thumbnailUrl: item.thumbnailUrl,
                   outputPath:

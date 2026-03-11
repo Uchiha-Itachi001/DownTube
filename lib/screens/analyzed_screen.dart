@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
@@ -150,6 +150,33 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   void _onStateChange() {
     if (!mounted) return;
     final state = AppState.instance.fetchState;
+
+    // Detect incomplete data on a single-video success (all quality tiles would
+    // show N/A / redirect to lowest quality instead of real data).
+    if (state == FetchState.success &&
+        _lastNotifiedFetchState != FetchState.success &&
+        !AppState.instance.isPlaylist) {
+      final info = AppState.instance.videoInfo;
+      if (info != null &&
+          info.maxVideoHeight == 0 &&
+          !info.formats.any((f) => f.hasVideo)) {
+        _lastNotifiedFetchState = FetchState.success; // mark handled
+        _loadingNotifDismiss?.value = true;
+        _loadingNotifDismiss = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          showAppNotification(
+            context,
+            type: NotificationType.error,
+            message: 'Could not load quality data. Please try again.',
+            duration: const Duration(seconds: 5),
+          );
+          widget.onError?.call();
+        });
+        return;
+      }
+    }
+
     // Only reset quality/tab/format on success transition for single videos
     if (state == FetchState.success &&
         _lastNotifiedFetchState != FetchState.success) {
