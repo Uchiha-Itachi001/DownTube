@@ -85,6 +85,14 @@ class DashboardScreen extends StatelessWidget {
               ),
             ),
           ),
+          // BETA badge — top right corner
+          Positioned(
+            top: 14,
+            right: 14,
+            child: IgnorePointer(
+              child: _BetaBadge(),
+            ),
+          ),
         ],
       ),
     );
@@ -240,6 +248,58 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
+
+// ── BETA Badge ────────────────────────────────────────────────────────────────
+class _BetaBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withOpacity(0.10),
+        border: Border.all(color: AppColors.accent.withOpacity(0.50)),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withOpacity(0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accent.withOpacity(0.8),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'BETA',
+            style: AppTextStyles.outfit(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: AppColors.accent,
+              letterSpacing: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _FeaturePill extends StatefulWidget {
   final IconData icon;

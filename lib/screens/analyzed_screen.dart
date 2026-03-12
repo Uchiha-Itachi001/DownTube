@@ -58,17 +58,42 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   List<String> get _formats =>
       _selectedTab == 0 ? _videoFormats : _audioFormats;
 
+  static const _allVideoQualityTiers = [
+    _QOption('Best', 'Auto', badge: 'AUTO'),
+    _QOption('4K', 'Ultra HD', badge: 'HDR'),
+    _QOption('1440p', '2K'),
+    _QOption('1080p', 'Full HD'),
+    _QOption('720p', 'HD'),
+    _QOption('480p', 'SD'),
+    _QOption('360p', 'Low'),
+  ];
+
+  static int _minHeightForRes(String res) {
+    switch (res) {
+      case '4K': return 2160;
+      case '1440p': return 1440;
+      case '1080p': return 1080;
+      case '720p': return 720;
+      case '480p': return 480;
+      case '360p': return 360;
+      default: return 0;
+    }
+  }
+
+  int _qualityIndexFromDefault(String quality, List<_QOption> tiers) {
+    final idx = tiers.indexWhere((q) => q.res == quality);
+    return idx >= 0 ? idx : 0;
+  }
+
   List<_QOption> _videoQualityTiers(VideoInfo? info) {
-    // Always show all quality tiers — yt-dlp will pick the closest match
-    return const [
-      _QOption('Best', 'Auto', badge: 'AUTO'),
-      _QOption('4K', 'Ultra HD', badge: 'HDR'),
-      _QOption('1440p', '2K'),
-      _QOption('1080p', 'Full HD'),
-      _QOption('720p', 'HD'),
-      _QOption('480p', 'SD'),
-      _QOption('360p', 'Low'),
-    ];
+    if (info == null) return _allVideoQualityTiers;
+    final maxH = info.maxVideoHeight;
+    if (maxH == 0) return _allVideoQualityTiers;
+    // Only show tiers whose minimum height is at or below the video's actual height
+    return _allVideoQualityTiers.where((q) {
+      if (q.res == 'Best') return true;
+      return _minHeightForRes(q.res) <= maxH;
+    }).toList();
   }
 
   List<_QOption> _qualities(VideoInfo? info) =>
@@ -121,6 +146,9 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   void initState() {
     super.initState();
     _outputPath = AppState.instance.downloadPath;
+    _selectedFormat = AppState.instance.defaultFormat;
+    _selectedQuality = _qualityIndexFromDefault(
+        AppState.instance.defaultQuality, _videoQualityTiers(null));
     // Initialise with current state so we don't fire a spurious
     // "Video ready!" notification when the screen opens while
     // fetchState is already success from a previous fetch.
@@ -181,10 +209,12 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
     if (state == FetchState.success &&
         _lastNotifiedFetchState != FetchState.success) {
       if (!AppState.instance.isPlaylist) {
+        final tiers = _videoQualityTiers(_info);
         setState(() {
-          _selectedQuality = 0;
+          _selectedQuality = _qualityIndexFromDefault(
+              AppState.instance.defaultQuality, tiers);
           _selectedTab = 0;
-          _selectedFormat = 'MP4';
+          _selectedFormat = AppState.instance.defaultFormat;
         });
       } else {
         setState(() {});
@@ -1047,7 +1077,9 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           () => setState(() {
             _selectedTab = index;
             _selectedQuality = 0;
-            _selectedFormat = index == 0 ? 'MP4' : 'MP3';
+            _selectedFormat = index == 0
+                ? AppState.instance.defaultFormat
+                : AppState.instance.defaultAudioFormat;
           }),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),

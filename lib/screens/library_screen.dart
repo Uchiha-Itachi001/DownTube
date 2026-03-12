@@ -1,5 +1,6 @@
 ﻿import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/app_colors.dart';
 import '../core/app_text_styles.dart';
 import '../models/download_item.dart';
@@ -407,10 +408,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
     return CustomScrollView(slivers: slivers);
   }
 
-  void _openFile(DownloadItem item) {
+  void _openFile(DownloadItem item) async {
     final path = item.filePath.isNotEmpty ? item.filePath : item.outputPath;
-    if (path.isEmpty || !File(path).existsSync()) return;
-    Process.run('cmd', ['/c', 'start', '', path]);
+    if (path.isEmpty) return;
+    final uri = Uri.file(path);
+    // Use url_launcher for reliable cross-platform file opening (handles
+    // paths with spaces, parentheses, and other special characters correctly).
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      // Fallback: try to open with explorer directly
+      await Process.run('explorer', [path], runInShell: false);
+    }
   }
 
   Future<void> _confirmDelete(DownloadItem item) async {

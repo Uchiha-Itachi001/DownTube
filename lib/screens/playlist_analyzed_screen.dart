@@ -6,6 +6,7 @@ import '../core/app_text_styles.dart';
 import '../models/download_item.dart';
 import '../models/playlist_entry.dart';
 import '../models/playlist_info.dart';
+import '../models/video_info.dart';
 import '../providers/app_state.dart';
 import '../widgets/app_notification.dart';
 import '../widgets/shimmer_box.dart';
@@ -46,6 +47,33 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
   static const _formats = ['MP4', 'MKV', 'WEBM'];
   static const _audioFormats = ['MP3', 'M4A', 'FLAC', 'WAV', 'OGG'];
 
+  // Calibration: first-video fetch gives real bitrates & max quality for filtering
+  VideoInfo? _calibrationInfo;
+  bool _calibrationFetching = false;
+
+  static int _minHeightForQual(String q) {
+    switch (q) {
+      case '4K': return 2160;
+      case '1440p': return 1440;
+      case '1080p': return 1080;
+      case '720p': return 720;
+      case '480p': return 480;
+      case '360p': return 360;
+      default: return 0;
+    }
+  }
+
+  List<String> get _filteredQualities {
+    final info = _calibrationInfo;
+    if (info == null) return _qualities;
+    final maxH = info.maxVideoHeight;
+    if (maxH <= 0) return _qualities;
+    return _qualities.where((q) {
+      if (q == 'Best') return true;
+      return _minHeightForQual(q) <= maxH;
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +82,35 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
     AppState.instance.addListener(_onStateChange);
     // If playlist already loaded, initialize checked entries
     _initChecked();
+  }
+
+  Future<void> _fetchCalibrationInfo() async {
+    if (_calibrationFetching || _calibrationInfo != null) return;
+    final entries = AppState.instance.playlistInfo?.entries ?? [];
+    final first = entries.firstWhere((e) => e.isAvailable, orElse: () => entries.isNotEmpty ? entries.first : throw Exception('empty'));
+    _calibrationFetching = true;
+    try {
+      final json = await AppState.instance.ytDlp.fetchMetadata(first.url);
+      if (json != null && mounted) {
+        final info = VideoInfo.fromYtDlpJson(json);
+        setState(() {
+          _calibrationInfo = info;
+          _calibrationFetching = false;
+          // Clamp global quality to available tiers
+          if (!_filteredQualities.contains(_globalQuality)) {
+            _globalQuality = _filteredQualities.last;
+          }
+          // Clamp per-row overrides
+          for (final key in _rowQualityOverrides.keys.toList()) {
+            if (!_filteredQualities.contains(_rowQualityOverrides[key])) {
+              _rowQualityOverrides.remove(key);
+            }
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _calibrationFetching = false);
+    }
   }
 
   void _initChecked() {
@@ -89,6 +146,12 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
     if (state == PlaylistFetchState.success && _lastState != PlaylistFetchState.success) {
       // Final sync when streaming completes
       _initChecked();
+    }
+
+    // Start calibration fetch once we have at least one available entry
+    if (!_calibrationFetching && _calibrationInfo == null && info != null &&
+        info.entries.any((e) => e.isAvailable)) {
+      _fetchCalibrationInfo();
     }
 
     _lastState = state;
@@ -368,7 +431,7 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
                             setState(() => _globalAudioFormat = v);
                           }),
                         ] else ...[
-                          _settingsRow('QUALITY', _globalQuality, _qualities, (v) {
+                          _settingsRow('QUALITY', _globalQuality, _filteredQualities, (v) {
                             setState(() => _globalQuality = v);
                           }),
                           const SizedBox(height: 8),
@@ -598,15 +661,19 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
       } else {
         // Use per-row override if set, otherwise global quality
         final qual = _rowQualityOverrides[e.id] ?? _globalQuality;
-        mbps = switch (qual) {
-          '4K' => 8.0,
-          '1440p' => 4.0,
-          '1080p' => 1.5,
-          '720p' => 0.8,
-          '480p' => 0.4,
-          '360p' => 0.2,
-          // 'Best' — no format data in playlist entries, 1080p is a safe fallback
-          _ => 1.5,
+        // Prefer real calibrated Mbps from the first-video fetch (much more
+        // accurate). Fall back to YouTube VP9/AV1 average bitrate table.
+        // 'Best' == '4K' in the fallback so Best never shows less than 4K.
+        final calibrated = _calibrationInfo?.calibratedMbps(qual);
+        mbps = calibrated ?? switch (qual) {
+          'Best'  => 4.0,  // same as 4K — best available is at most 4K-level
+          '4K'    => 4.0,
+          '1440p' => 2.5,
+          '1080p' => 1.2,
+          '720p'  => 0.6,
+          '480p'  => 0.3,
+          '360p'  => 0.15,
+          _       => 1.2,
         };
       }
 
@@ -791,6 +858,7 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
                       onToggle: (v) => _toggleEntry(entry.id, v),
                       qualityOverride: _rowQualityOverrides[entry.id],
                       globalQuality: _globalQuality,
+                      availableQualities: _filteredQualities,
                       onQualityChanged: (q) {
                         setState(() => _rowQualityOverrides[entry.id] = q);
                       },
@@ -943,6 +1011,7 @@ class _PlaylistVideoRow extends StatefulWidget {
   final ValueChanged<bool?> onToggle;
   final String? qualityOverride;
   final String globalQuality;
+  final List<String> availableQualities;
   final ValueChanged<String> onQualityChanged;
   final VoidCallback onDownload;
 
@@ -952,6 +1021,7 @@ class _PlaylistVideoRow extends StatefulWidget {
     required this.onToggle,
     this.qualityOverride,
     required this.globalQuality,
+    required this.availableQualities,
     required this.onQualityChanged,
     required this.onDownload,
   });
@@ -1095,6 +1165,7 @@ class _PlaylistVideoRowState extends State<_PlaylistVideoRow> {
               if (!unavailable) ...[
                 _QualityChip(
                   quality: quality,
+                  availableQualities: widget.availableQualities,
                   onChanged: widget.onQualityChanged,
                 ),
                 const SizedBox(width: 8),
@@ -1138,11 +1209,14 @@ class _PlaylistVideoRowState extends State<_PlaylistVideoRow> {
 // ─── QUALITY CHIP WITH POPUP ─────────────────────────────────────────────
 class _QualityChip extends StatelessWidget {
   final String quality;
+  final List<String> availableQualities;
   final ValueChanged<String> onChanged;
 
-  const _QualityChip({required this.quality, required this.onChanged});
-
-  static const _qualities = ['Best', '4K', '1440p', '1080p', '720p', '480p', '360p'];
+  const _QualityChip({
+    required this.quality,
+    required this.availableQualities,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1154,7 +1228,7 @@ class _QualityChip extends StatelessWidget {
         side: BorderSide(color: AppColors.border),
       ),
       offset: const Offset(0, 32),
-      itemBuilder: (_) => _qualities
+      itemBuilder: (_) => availableQualities
           .map((q) => PopupMenuItem<String>(
                 value: q,
                 height: 32,

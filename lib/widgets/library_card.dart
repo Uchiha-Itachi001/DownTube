@@ -120,6 +120,44 @@ class _LibraryCardState extends State<LibraryCard> {
             ),
           ),
         ),
+        // Hover play overlay — different tint for video vs audio
+        AnimatedOpacity(
+          opacity: _hovered ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 200),
+          child: Container(
+            color: Colors.black.withOpacity(0.42),
+            child: Center(
+              child: AnimatedScale(
+                scale: _hovered ? 1.0 : 0.6,
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutBack,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: accentColor.withOpacity(0.18),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: accentColor.withOpacity(0.85),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accentColor.withOpacity(0.4),
+                        blurRadius: 16,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.play_arrow_rounded,
+                    color: accentColor,
+                    size: 26,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
         // Type badge — top-left
         Positioned(
           top: 8,

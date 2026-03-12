@@ -228,21 +228,21 @@ class VideoInfo {
     double mbps;
     switch (resolution) {
       case '4K':
-        mbps = 8.0;
-      case '1440p':
         mbps = 4.0;
+      case '1440p':
+        mbps = 2.5;
       case '1080p':
-        mbps = 1.5;
+        mbps = 1.2;
       case '720p':
-        mbps = 0.8;
+        mbps = 0.6;
       case '480p':
-        mbps = 0.4;
+        mbps = 0.3;
       case '360p':
-        mbps = 0.2;
+        mbps = 0.15;
       case '240p':
-        mbps = 0.12;
+        mbps = 0.08;
       case '144p':
-        mbps = 0.06;
+        mbps = 0.04;
       case '320k':
         mbps = 320.0 / 1000;
       case '192k':
@@ -345,5 +345,34 @@ class VideoInfo {
       return '~${(mb / 1024).toStringAsFixed(1)} GB';
     }
     return '~${mb.toStringAsFixed(0)} MB';
+  }
+
+  /// Returns actual video bitrate in Mbps derived from real yt-dlp format data
+  /// combined with the video duration. Returns null if data is unavailable.
+  /// Handles 'Best' by delegating to the actual max available height tier.
+  /// Used by playlist size estimation to calibrate against a real video sample.
+  double? calibratedMbps(String resolution) {
+    if (duration == null || duration! == 0) return null;
+    if (resolution == 'Best') {
+      final h = maxVideoHeight;
+      final tier = h >= 2160
+          ? '4K'
+          : h >= 1440
+              ? '1440p'
+              : h >= 1080
+                  ? '1080p'
+                  : h >= 720
+                      ? '720p'
+                      : h >= 480
+                          ? '480p'
+                          : h >= 360
+                              ? '360p'
+                              : null;
+      if (tier == null) return null;
+      return calibratedMbps(tier);
+    }
+    final bytes = _estimateFromFormats(resolution);
+    if (bytes == null) return null;
+    return (bytes * 8) / (duration! * 1000000.0);
   }
 }

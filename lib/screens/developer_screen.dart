@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ class _DeveloperScreenState extends State<DeveloperScreen>
   late AnimationController _bgCtrl;
 
   bool _showRealCommits = false;
+  Timer? _toggleTimer;
 
   // ── Pixel font for "DOWNTUBE" (5×7, uppercase) ───────────────────────────
   static const Map<String, List<String>> _font = {
@@ -93,12 +95,21 @@ class _DeveloperScreenState extends State<DeveloperScreen>
     _bgCtrl =
         AnimationController(vsync: this, duration: const Duration(seconds: 18))
           ..repeat();
+    _startAutoToggle();
+  }
+
+  void _startAutoToggle() {
+    _toggleTimer?.cancel();
+    _toggleTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) setState(() => _showRealCommits = !_showRealCommits);
+    });
   }
 
   @override
   void dispose() {
     _pulseCtrl.dispose();
     _bgCtrl.dispose();
+    _toggleTimer?.cancel();
     super.dispose();
   }
 
@@ -143,7 +154,11 @@ class _DeveloperScreenState extends State<DeveloperScreen>
         final contributionGraph = _ContributionGraph(
           contributions: _showRealCommits ? _commitsGrid : _downtubeGrid,
           showRealCommits: _showRealCommits,
-          onToggle: () => setState(() => _showRealCommits = !_showRealCommits),
+          onToggle: () {
+            // Manual tap resets the 5 s timer so it doesn't flip right after
+            setState(() => _showRealCommits = !_showRealCommits);
+            _startAutoToggle();
+          },
         );
 
         final profileColumn = Column(
@@ -863,26 +878,43 @@ class _ContributionGraph extends StatelessWidget {
                             showRealCommits ? 0.55 : 0.25),
                       ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          showRealCommits
-                              ? Icons.commit_rounded
-                              : Icons.text_fields_rounded,
-                          size: 11,
-                          color: AppColors.accent,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0, 0.35),
+                            end: Offset.zero,
+                          ).animate(CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          )),
+                          child: child,
                         ),
-                        const SizedBox(width: 5),
-                        Text(
-                          showRealCommits ? 'Real commits' : 'DownTube',
-                          style: AppTextStyles.outfit(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
+                      ),
+                      child: Row(
+                        key: ValueKey(showRealCommits),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            showRealCommits
+                                ? Icons.commit_rounded
+                                : Icons.text_fields_rounded,
+                            size: 11,
                             color: AppColors.accent,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 5),
+                          Text(
+                            showRealCommits ? 'Real commits' : 'DownTube',
+                            style: AppTextStyles.outfit(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -890,8 +922,23 @@ class _ContributionGraph extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          // ── Grid ─────────────────────────────────────────────────────
-          ClipRect(
+          // ── Grid (animated crossfade between DownTube / commits) ─────
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 600),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.96, end: 1.0).animate(
+                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                ),
+                child: child,
+              ),
+            ),
+            child: KeyedSubtree(
+              key: ValueKey(showRealCommits),
+              child: ClipRect(
             child: LayoutBuilder(
             builder: (_, constraints) {
               final cellSize =
@@ -938,6 +985,8 @@ class _ContributionGraph extends StatelessWidget {
             },
           ),
           ),
+            ),  // KeyedSubtree
+          ),  // AnimatedSwitcher
           const SizedBox(height: 10),
           // ── Footer / legend ──────────────────────────────────────────
           Row(
