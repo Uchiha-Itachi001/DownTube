@@ -733,40 +733,6 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                     ),
                   ],
                   const SizedBox(height: 8),
-                  // Leftover file notice — informational only, no action.
-                  // Shows the folder location so the user can find and remove
-                  // the partial files manually.
-                  if (item.status == DownloadStatus.error &&
-                      item.filePath.isNotEmpty &&
-                      !item.filePath.contains('%('))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.only(top: 1),
-                            child: Icon(
-                              Icons.sd_card_alert_rounded,
-                              size: 10,
-                              color: Color(0xFFF59E0B),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              'Leftover: ${_leftoverFolder(item.filePath)}',
-                              style: AppTextStyles.mono(
-                                fontSize: 9,
-                                color: const Color(0xFFF59E0B),
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   // Format + action buttons row
                   Row(
                     children: [
@@ -812,16 +778,6 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
     final path = item.filePath.isNotEmpty ? item.filePath : item.outputPath;
     if (path.isEmpty || !File(path).existsSync()) return;
     Process.run('cmd', ['/c', 'start', '', path]);
-  }
-
-  /// Returns the parent folder of the first path in a pipe-separated list,
-  /// formatted as "…\parentFolder\" for compact display.
-  static String _leftoverFolder(String filePath) {
-    final firstPath = filePath.split('|').first.trim();
-    final sep = firstPath.contains('\\') ? '\\' : '/';
-    final parts = firstPath.split(sep).where((s) => s.isNotEmpty).toList();
-    if (parts.length >= 2) return '\u2026$sep${parts[parts.length - 2]}$sep';
-    return firstPath;
   }
 
   Widget _buildThumbnail(DownloadItem item, Color accent, bool hovered) {
