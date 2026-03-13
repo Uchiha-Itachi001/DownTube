@@ -86,6 +86,7 @@ class _AppShellState extends State<AppShell>
           DownloadNotifType.audioPhase => (NotificationType.info, null),
           DownloadNotifType.mergeDone => (NotificationType.success, null),
           DownloadNotifType.downloadError => (NotificationType.error, null),
+          DownloadNotifType.offline => (NotificationType.error, null),
         };
         showAppNotification(
           context,

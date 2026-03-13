@@ -8,13 +8,14 @@ import '../models/playlist_entry.dart';
 import '../services/prefs_service.dart';
 import '../services/ytdlp_service.dart';
 import '../services/download_db.dart';
+import '../services/connectivity_service.dart';
 
 enum FetchState { idle, loading, success, error }
 
 enum PlaylistFetchState { idle, loadingEntries, success, error }
 
 // Phase notifications (consumed by UI to show overlay cards)
-enum DownloadNotifType { videoPhase, audioPhase, mergeDone, downloadError }
+enum DownloadNotifType { videoPhase, audioPhase, mergeDone, downloadError, offline }
 
 class DownloadNotification {
   final String message;
@@ -38,6 +39,14 @@ class AppState extends ChangeNotifier {
   // Engine status
   bool ytDlpReady = false;
   String? ytDlpVersion;
+  /// Latest version string from GitHub (null until checked).
+  String? latestYtDlpVersion;
+  /// True when a newer version is available and not yet installed.
+  bool ytDlpUpdateAvailable = false;
+  /// True while a yt-dlp download/update is in progress.
+  bool ytDlpUpdating = false;
+  /// 0..1 progress of an in-progress yt-dlp download (or -1 = indeterminate).
+  double ytDlpDownloadProgress = 0.0;
   String? downloadPath;
 
   // Theme color (accent)
@@ -191,6 +200,11 @@ class AppState extends ChangeNotifier {
       ytDlpVersion = await ytDlp.getVersion();
     }
 
+    // Check for yt-dlp updates in the background.
+    // If autoUpdateYtDlp is on, download and install automatically.
+    // If off, just record the latest version so the Settings screen can show it.
+    _scheduleYtDlpUpdateCheck();
+
     // Load persisted download history from SQLite
     await _loadHistory();
 
@@ -244,6 +258,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Check connectivity before hitting yt-dlp
+      if (!await ConnectivityService.isOnline()) {
+        pendingNotifications.add(DownloadNotification(
+          message: 'You are offline',
+          subtitle: 'Connect to the internet and try again',
+          type: DownloadNotifType.offline,
+        ));
+        throw Exception('No internet connection. Connect to the internet and try again.');
+      }
+
       // Quick fetch: --playlist-items 1 detects type in 1-3 seconds even for huge playlists
       final json = await ytDlp.fetchQuickInfo(url);
       if (json == null) {
@@ -337,6 +361,21 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> _executeDownload(DownloadItem item) async {
+    // Check connectivity before starting the download
+    if (!await ConnectivityService.isOnline()) {
+      item.status = DownloadStatus.error;
+      item.errorMessage = 'No internet connection';
+      pendingNotifications.add(DownloadNotification(
+        message: 'You are offline',
+        subtitle: 'Connect to the internet to download',
+        type: DownloadNotifType.offline,
+      ));
+      await DownloadDb.save(item);
+      _onDownloadFinished();
+      notifyListeners();
+      return;
+    }
+
     item.status = DownloadStatus.downloading;
     item.phase = DownloadPhase.video;
     notifyListeners();
@@ -408,7 +447,14 @@ class AppState extends ChangeNotifier {
             item.phase = audioOnly ? DownloadPhase.audio : DownloadPhase.video;
             item.progress = 0.0;
           } else {
-            // Second file — audio track (video+audio download)
+            // Second file — audio track (video+audio download).
+            // IMPORTANT: update partialPath to the second stream so that
+            // cancel/delete operations can track and remove this file too.
+            // We store both paths pipe-separated so permanentlyDelete can
+            // clean up both the completed first stream and the partial second.
+            final secondDest = line.substring(line.indexOf('Destination:') + 'Destination:'.length).trim();
+            item.partialPath = '$_firstDest|$secondDest';
+            DownloadDb.updateActivePartialPath(item.id, '$_firstDest|$secondDest');
             item.phase = DownloadPhase.audio;
             item.progress = 0.0;
             pendingNotifications.add(DownloadNotification(
@@ -515,6 +561,10 @@ class AppState extends ChangeNotifier {
       // Persist to SQLite
       await DownloadDb.save(item);
     } catch (e) {
+      // If the download was cancelled by the user, cancelDownload() already
+      // set the state and called _onDownloadFinished(). Don't process twice.
+      if (item.errorMessage == 'Cancelled') return;
+
       item.status = DownloadStatus.error;
       item.errorMessage = e.toString();
       // Store partial file path so user can delete leftovers from history.
@@ -563,24 +613,12 @@ class AppState extends ChangeNotifier {
     final idx = downloads.indexWhere((d) => d.id == id);
     if (idx == -1) return;
     final wasActive = downloads[idx].status == DownloadStatus.downloading;
-    // Delete any leftover partial file before clearing the path
     final partialPath = downloads[idx].partialPath;
-    if (partialPath.isNotEmpty) {
-      try {
-        final f = File(partialPath);
-        if (await f.exists()) await f.delete();
-      } catch (_) {}
-      // Also try .part file that yt-dlp may create
-      try {
-        final partFile = File('$partialPath.part');
-        if (await partFile.exists()) await partFile.delete();
-      } catch (_) {}
-    }
     downloads[idx].status = DownloadStatus.error;
     downloads[idx].phase = DownloadPhase.complete;
     downloads[idx].errorMessage = 'Cancelled';
     downloads[idx].progress = 0.0;
-    // Store partial path so user can delete leftover from history
+    // Keep partial path so user can delete the leftover file from history
     if (partialPath.isNotEmpty) {
       downloads[idx].filePath = partialPath;
     }
@@ -602,8 +640,6 @@ class AppState extends ChangeNotifier {
 
   /// Cancel all active and queued downloads.
   Future<void> cancelAllDownloads() async {
-    // Cleanup leftover partial files for all tracked active downloads
-    await DownloadDb.cleanupAllActiveLeftovers();
     final toCancel = downloads
         .where((d) =>
             d.status == DownloadStatus.downloading ||
@@ -615,7 +651,11 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Permanently remove a record AND delete the file from disk then purge from DB.
+  /// Permanently remove a record AND delete the file(s) from disk then purge from DB.
+  ///
+  /// [item.filePath] may contain pipe-separated paths when a video+audio download
+  /// was cancelled mid-second-stream (e.g. "video.f137.webm|audio.f251.m4a").
+  /// All paths are deleted together with any accompanying `.part` companions.
   Future<void> permanentlyDelete(String id) async {
     final idx = downloads.indexWhere((d) => d.id == id);
     if (idx == -1) {
@@ -624,12 +664,23 @@ class AppState extends ChangeNotifier {
       return;
     }
     final item = downloads[idx];
-    // Prefer the exact file path; fall back to outputPath (treated as directory)
-    final target = item.filePath.isNotEmpty ? item.filePath : item.outputPath;
-    if (target.isNotEmpty) {
+    // Collect all paths to delete (pipe-separated for multi-stream leftovers)
+    final rawTarget = item.filePath.isNotEmpty ? item.filePath : item.outputPath;
+    final targets = rawTarget
+        .split('|')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+    for (final target in targets) {
       try {
         final f = File(target);
-        if (await f.exists()) await f.delete();
+        if (await f.exists()) {
+          await f.delete();
+        } else {
+          // Also check for yt-dlp .part companion left by a cancelled download
+          final partFile = File('$target.part');
+          if (await partFile.exists()) await partFile.delete();
+        }
       } catch (_) {}
     }
     downloads.removeWhere((d) => d.id == id);
@@ -714,6 +765,78 @@ class AppState extends ChangeNotifier {
     if (found) ytDlpVersion = await ytDlp.getVersion();
     notifyListeners();
   }
+
+  // ---------------------------------------------------------------------------
+  // yt-dlp update logic
+  // ---------------------------------------------------------------------------
+
+  /// Kicks off a version check in the background without blocking init().
+  void _scheduleYtDlpUpdateCheck() {
+    Future.microtask(() => checkAndUpdateYtDlp(silent: true));
+  }
+
+  /// Check GitHub for a newer yt-dlp and, if [autoUpdateYtDlp] is enabled,
+  /// download and install it automatically.
+  ///
+  /// [silent] = true  : background call, only notifies when done
+  /// [silent] = false : called by user (Settings), updates progress in realtime
+  Future<void> checkAndUpdateYtDlp({bool silent = false}) async {
+    if (ytDlpUpdating) return; // already running
+
+    final latest = await ytDlp.checkLatestVersion();
+    if (latest == null) return; // network/API failure
+
+    latestYtDlpVersion = latest;
+    final current = ytDlpVersion;
+    ytDlpUpdateAvailable = current == null || current.trim() != latest.trim();
+
+    if (!ytDlpUpdateAvailable) {
+      notifyListeners();
+      return;
+    }
+
+    if (!autoUpdateYtDlp && silent) {
+      // Just flag it — let the user decide from Settings
+      notifyListeners();
+      return;
+    }
+
+    // Proceed with download
+    await _doYtDlpUpdate(silent: silent);
+  }
+
+  /// Download and install the latest yt-dlp.exe to the app data folder.
+  Future<void> _doYtDlpUpdate({bool silent = false}) async {
+    ytDlpUpdating = true;
+    ytDlpDownloadProgress = 0.0;
+    if (!silent) notifyListeners();
+
+    final targetPath = YtDlpService.defaultInstallPath;
+    final success = await ytDlp.downloadLatest(
+      targetPath,
+      onProgress: (received, total) {
+        if (total > 0) {
+          ytDlpDownloadProgress = received / total;
+        } else {
+          ytDlpDownloadProgress = -1; // indeterminate
+        }
+        if (!silent) notifyListeners();
+      },
+    );
+
+    ytDlpUpdating = false;
+    if (success) {
+      ytDlpReady = true;
+      ytDlpVersion = await ytDlp.getVersion();
+      ytDlpUpdateAvailable = false;
+      await _prefs?.setYtDlpPath(targetPath);
+    }
+    notifyListeners();
+  }
+
+  /// Called from the Settings screen "Check for update" button.
+  Future<void> manualCheckYtDlpUpdate() =>
+      checkAndUpdateYtDlp(silent: false);
 
   // User profile setters
   Future<void> setUserProfile({

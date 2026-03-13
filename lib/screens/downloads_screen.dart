@@ -347,20 +347,16 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   Widget _buildTotalSize(List<DownloadItem> all) {
     // Sum actual file sizes of actively downloading items
     int totalBytes = 0;
-    int count = 0;
     for (final d in all) {
-      if (d.status == DownloadStatus.downloading || d.status == DownloadStatus.done) {
+      if (d.status == DownloadStatus.downloading) {
         final bytes = d.fileSizeBytes;
-        if (bytes > 0) {
-          totalBytes += bytes;
-          count++;
-        }
+        if (bytes > 0) totalBytes += bytes;
       }
     }
 
     String sizeStr;
     if (totalBytes == 0) {
-      sizeStr = '0 B';
+      sizeStr = '0 MB';
     } else if (totalBytes >= 1e9) {
       sizeStr = '${(totalBytes / 1e9).toStringAsFixed(2)} GB';
     } else if (totalBytes >= 1e6) {
@@ -373,21 +369,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
 
     return SectionCard(
       title: 'TOTAL SIZE',
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: StatTile(value: sizeStr, label: 'Downloaded', unit: ''),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: StatTile(value: '$count', label: 'With Size', unit: ''),
-              ),
-            ],
-          ),
-        ],
-      ),
+      child: StatTile(value: sizeStr, label: 'In Progress', unit: ''),
     );
   }
 
@@ -751,22 +733,34 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                     ),
                   ],
                   const SizedBox(height: 8),
-                  // Partial file path for error videos
-                  if (item.status == DownloadStatus.error && item.filePath.isNotEmpty)
+                  // Leftover file notice — informational only, no action.
+                  // Shows the folder location so the user can find and remove
+                  // the partial files manually.
+                  if (item.status == DownloadStatus.error &&
+                      item.filePath.isNotEmpty &&
+                      !item.filePath.contains('%('))
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.folder_outlined, size: 10, color: AppColors.muted2),
+                          const Padding(
+                            padding: EdgeInsets.only(top: 1),
+                            child: Icon(
+                              Icons.sd_card_alert_rounded,
+                              size: 10,
+                              color: Color(0xFFF59E0B),
+                            ),
+                          ),
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              _shortPath(item.filePath),
+                              'Leftover: ${_leftoverFolder(item.filePath)}',
                               style: AppTextStyles.mono(
                                 fontSize: 9,
-                                color: AppColors.muted2,
+                                color: const Color(0xFFF59E0B),
                               ),
-                              maxLines: 1,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -820,10 +814,14 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
     Process.run('cmd', ['/c', 'start', '', path]);
   }
 
-  static String _shortPath(String p) {
-    final parts = p.replaceAll('\\', '/').split('/');
-    if (parts.length >= 2) return '${parts[parts.length - 2]}/${parts.last}';
-    return parts.last;
+  /// Returns the parent folder of the first path in a pipe-separated list,
+  /// formatted as "…\parentFolder\" for compact display.
+  static String _leftoverFolder(String filePath) {
+    final firstPath = filePath.split('|').first.trim();
+    final sep = firstPath.contains('\\') ? '\\' : '/';
+    final parts = firstPath.split(sep).where((s) => s.isNotEmpty).toList();
+    if (parts.length >= 2) return '\u2026$sep${parts[parts.length - 2]}$sep';
+    return firstPath;
   }
 
   Widget _buildThumbnail(DownloadItem item, Color accent, bool hovered) {
@@ -960,21 +958,48 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
               ),
             ),
           ),
-        // Play icon hover overlay for done
-        if (hovered && item.status == DownloadStatus.done)
+        // Play icon hover overlay for done (library card style)
+        if (item.status == DownloadStatus.done)
           Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.55),
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(AppColors.radius - 1),
+            child: AnimatedOpacity(
+              opacity: hovered ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 200),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.42),
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(AppColors.radius - 1),
+                  ),
                 ),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.play_circle_fill_rounded,
-                  color: Colors.white.withOpacity(0.9),
-                  size: 32,
+                child: Center(
+                  child: AnimatedScale(
+                    scale: hovered ? 1.0 : 0.6,
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutBack,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: accent.withOpacity(0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: accent.withOpacity(0.85),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accent.withOpacity(0.4),
+                            blurRadius: 16,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: accent,
+                        size: 24,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

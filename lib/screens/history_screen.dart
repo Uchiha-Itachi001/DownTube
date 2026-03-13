@@ -884,13 +884,6 @@ class _HistoryTileState extends State<_HistoryTile> {
     return '${dt.day}/${dt.month}/${dt.year}';
   }
 
-  /// Formats a full path to "parentFolder/filename.ext" for compact display.
-  static String _shortPath(String p) {
-    final parts = p.replaceAll('\\', '/').split('/');
-    if (parts.length >= 2) return '${parts[parts.length - 2]}/${parts.last}';
-    return parts.last;
-  }
-
   Future<void> _confirmDelete() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -931,7 +924,7 @@ class _HistoryTileState extends State<_HistoryTile> {
               ),
               const SizedBox(height: 14),
               Text(
-                'Delete "${widget.item.title}"?\n\nThis will remove it from history and permanently delete the file from your device.',
+                'Delete "${widget.item.title}"?\n\nThis will remove it from the app history and but not delete the file from your device.',
                 style: AppTextStyles.outfit(
                     fontSize: 13, color: AppColors.muted, height: 1.5),
               ),
@@ -978,6 +971,19 @@ class _HistoryTileState extends State<_HistoryTile> {
         );
       }
     }
+  }
+
+  /// Returns the parent folder of the first path in a pipe-separated list,
+  /// formatted for compact display (last two segments).
+  static String _leftoverFolder(String filePath) {
+    final firstPath = filePath.split('|').first.trim();
+    final sep = firstPath.contains('\\') ? '\\' : '/';
+    final parts = firstPath.split(sep).where((s) => s.isNotEmpty).toList();
+    if (parts.length >= 2) {
+      // Show parent folder + filename: …\Videos\DownTube\
+      return '\u2026${sep}${parts[parts.length - 2]}${sep}';
+    }
+    return firstPath;
   }
 
   @override
@@ -1051,17 +1057,44 @@ class _HistoryTileState extends State<_HistoryTile> {
                         ),
                       ),
                     ),
-                  if (_hovered && success)
+                  if (success)
                     Positioned.fill(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          color: Colors.black.withOpacity(0.55),
-                          child: Center(
-                            child: Icon(
-                              Icons.play_circle_fill_rounded,
-                              color: Colors.white.withOpacity(0.9),
-                              size: 22,
+                        child: AnimatedOpacity(
+                          opacity: _hovered ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: Container(
+                            color: Colors.black.withOpacity(0.42),
+                            child: Center(
+                              child: AnimatedScale(
+                                scale: _hovered ? 1.0 : 0.6,
+                                duration: const Duration(milliseconds: 280),
+                                curve: Curves.easeOutBack,
+                                child: Container(
+                                  width: 30,
+                                  height: 30,
+                                  decoration: BoxDecoration(
+                                    color: accent.withOpacity(0.18),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: accent.withOpacity(0.85),
+                                      width: 1.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: accent.withOpacity(0.4),
+                                        blurRadius: 12,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: accent,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1109,21 +1142,32 @@ class _HistoryTileState extends State<_HistoryTile> {
                       ],
                     ],
                   ),
-                  // Partial file path for error videos
-                  if (!success && item.filePath.isNotEmpty) ...[
-                    const SizedBox(height: 3),
+                  // Leftover file notice — no action, just tells the user
+                  // where the partial files are so they can manage them.
+                  if (!success &&
+                      item.filePath.isNotEmpty &&
+                      !item.filePath.contains('%(')) ...[
+                    const SizedBox(height: 4),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.folder_outlined, size: 10, color: AppColors.muted2),
-                        const SizedBox(width: 3),
+                        const Padding(
+                          padding: EdgeInsets.only(top: 1),
+                          child: Icon(
+                            Icons.sd_card_alert_rounded,
+                            size: 10,
+                            color: Color(0xFFF59E0B),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            _shortPath(item.filePath),
+                            'Leftover files at: ${_leftoverFolder(item.filePath)}',
                             style: AppTextStyles.mono(
                               fontSize: 9,
-                              color: AppColors.muted2,
+                              color: const Color(0xFFF59E0B),
                             ),
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),

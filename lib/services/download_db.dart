@@ -214,13 +214,21 @@ class DownloadDb {
   }
 
   /// Clean up all tracked active downloads and delete their partial files.
+  /// [partial_path] may be pipe-separated (e.g. "stream1|stream2") when a
+  /// video+audio download was interrupted mid-second-stream.
   static Future<int> cleanupAllActiveLeftovers() async {
     final db = await _database;
     final rows = await db.query('active_downloads');
     int cleaned = 0;
     for (final row in rows) {
-      final partialPath = row['partial_path'] as String? ?? '';
-      if (partialPath.isNotEmpty) {
+      final rawPath = row['partial_path'] as String? ?? '';
+      // Handle pipe-separated multi-stream paths
+      final paths = rawPath
+          .split('|')
+          .map((p) => p.trim())
+          .where((p) => p.isNotEmpty)
+          .toList();
+      for (final partialPath in paths) {
         // Delete the partial file and any .part companion
         try {
           final f = File(partialPath);

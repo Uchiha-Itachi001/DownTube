@@ -73,6 +73,107 @@ class YtDlpService {
     return null;
   }
 
+  /// Fetch the latest yt-dlp release tag from GitHub.
+  /// Returns the version string (e.g. "2024.12.17") or null on failure.
+  Future<String?> checkLatestVersion() async {
+    HttpClient? client;
+    try {
+      client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 10);
+      final request = await client
+          .getUrl(Uri.parse(
+            'https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest',
+          ))
+          .timeout(const Duration(seconds: 15));
+      request.headers.set('User-Agent', 'DownTube-App');
+      request.headers.set('Accept', 'application/vnd.github+json');
+      final response = await request.close();
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        final json = jsonDecode(body) as Map<String, dynamic>;
+        final tag = json['tag_name'] as String?;
+        if (tag != null) {
+          // GitHub tags for yt-dlp are like "2024.12.17" (no "v" prefix)
+          return tag.replaceFirst(RegExp(r'^v'), '');
+        }
+      }
+    } catch (_) {
+      // Network unavailable or API failure — ignore silently
+    } finally {
+      client?.close(force: false);
+    }
+    return null;
+  }
+
+  /// Download the latest yt-dlp.exe from GitHub releases to [targetPath].
+  /// Calls [onProgress] with bytes received / total bytes (total may be -1
+  /// when the server doesn't send Content-Length).
+  /// Returns true on success.
+  Future<bool> downloadLatest(
+    String targetPath, {
+    void Function(int received, int total)? onProgress,
+  }) async {
+    HttpClient? client;
+    try {
+      // Ensure the parent directory exists
+      final dir = Directory(File(targetPath).parent.path);
+      if (!await dir.exists()) await dir.create(recursive: true);
+
+      client = HttpClient();
+      // GitHub releases redirect to a CDN — follow redirects
+      final request = await client
+          .getUrl(Uri.parse(
+            'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe',
+          ))
+          .timeout(const Duration(seconds: 30));
+      request.followRedirects = true;
+      request.maxRedirects = 5;
+      request.headers.set('User-Agent', 'DownTube-App');
+      final response = await request.close();
+
+      if (response.statusCode != 200) return false;
+
+      final total = response.contentLength; // -1 if unknown
+      int received = 0;
+
+      // Write to a temp file first so a partial download never replaces a
+      // working binary.
+      final tmpPath = '$targetPath.download';
+      final sink = File(tmpPath).openWrite();
+      try {
+        await for (final chunk in response) {
+          sink.add(chunk);
+          received += chunk.length;
+          onProgress?.call(received, total);
+        }
+      } finally {
+        await sink.flush();
+        await sink.close();
+      }
+
+      // Atomically replace the target
+      if (await File(targetPath).exists()) await File(targetPath).delete();
+      await File(tmpPath).rename(targetPath);
+
+      // Update cached exec path
+      _execPath = targetPath;
+      return true;
+    } catch (_) {
+      // Clean up temp file if present
+      try { await File('$targetPath.download').delete(); } catch (_) {}
+      return false;
+    } finally {
+      client?.close(force: false);
+    }
+  }
+
+  /// Returns the canonical install path for the bundled yt-dlp.exe.
+  /// This is %APPDATA%\DownTube\yt-dlp.exe on Windows.
+  static String get defaultInstallPath {
+    final appData = Platform.environment['APPDATA'] ?? '.';
+    return '$appData\\DownTube\\yt-dlp.exe';
+  }
+
   Future<Map<String, dynamic>?> fetchMetadata(String url) async {
     if (_execPath == null) return null;
 
@@ -244,6 +345,15 @@ class YtDlpService {
           .listen(controller.add, onError: controller.addError, onDone: onDone);
       await for (final line in controller.stream) {
         yield line;
+      }
+      // Verify yt-dlp exited cleanly — non-zero means the download was
+      // interrupted (network dropped, server error, yt-dlp crash).
+      final ec = await process.exitCode;
+      if (ec != 0) {
+        throw Exception(
+          'yt-dlp exited with code $ec. The download was interrupted '
+          '(network dropped or server error).',
+        );
       }
     } finally {
       _activeDownloads.remove(id);
