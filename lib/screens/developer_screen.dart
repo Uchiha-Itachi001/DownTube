@@ -798,7 +798,7 @@ class _StatBoxState extends State<_StatBox> {
 
 // ── Contribution graph ────────────────────────────────────────────────────────
 
-class _ContributionGraph extends StatelessWidget {
+class _ContributionGraph extends StatefulWidget {
   final List<int> contributions;
   final bool showRealCommits;
   final VoidCallback onToggle;
@@ -807,6 +807,49 @@ class _ContributionGraph extends StatelessWidget {
     required this.showRealCommits,
     required this.onToggle,
   });
+
+  @override
+  State<_ContributionGraph> createState() => _ContributionGraphState();
+}
+
+class _ContributionGraphState extends State<_ContributionGraph>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _waveCtrl;
+
+  // Snapshot of the state BEFORE the last toggle — used to render columns
+  // that the wave front hasn't reached yet ("old" side of the printer head).
+  List<int> _prevContributions = [];
+  bool _prevLit = true; // lit == !showRealCommits
+
+  @override
+  void initState() {
+    super.initState();
+    _prevContributions = List.from(widget.contributions);
+    _prevLit = !widget.showRealCommits;
+    _waveCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    // Start at value=1 so on first render everything shows the current state
+    _waveCtrl.value = 1.0;
+  }
+
+  @override
+  void didUpdateWidget(covariant _ContributionGraph oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.showRealCommits != oldWidget.showRealCommits) {
+      // Capture the OLD state before starting the reveal animation
+      _prevContributions = List.from(oldWidget.contributions);
+      _prevLit = !oldWidget.showRealCommits;
+      _waveCtrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _waveCtrl.dispose();
+    super.dispose();
+  }
 
   Color _cellColor(int level, bool lit) {
     if (!lit && level == 0) return AppColors.accent.withOpacity(0.055);
@@ -826,8 +869,6 @@ class _ContributionGraph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const weeks = 52;
-    const days = 7;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -861,7 +902,7 @@ class _ContributionGraph extends StatelessWidget {
               ),
               // Toggle button
               GestureDetector(
-                onTap: onToggle,
+                onTap: widget.onToggle,
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: AnimatedContainer(
@@ -869,13 +910,13 @@ class _ContributionGraph extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: showRealCommits
+                      color: widget.showRealCommits
                           ? AppColors.accentDim
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: AppColors.accent.withOpacity(
-                            showRealCommits ? 0.55 : 0.25),
+                            widget.showRealCommits ? 0.55 : 0.25),
                       ),
                     ),
                     child: AnimatedSwitcher(
@@ -894,11 +935,11 @@ class _ContributionGraph extends StatelessWidget {
                         ),
                       ),
                       child: Row(
-                        key: ValueKey(showRealCommits),
+                        key: ValueKey(widget.showRealCommits),
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            showRealCommits
+                            widget.showRealCommits
                                 ? Icons.commit_rounded
                                 : Icons.text_fields_rounded,
                             size: 11,
@@ -906,7 +947,7 @@ class _ContributionGraph extends StatelessWidget {
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            showRealCommits ? 'Real commits' : 'DownTube',
+                            widget.showRealCommits ? 'Real commits' : 'DownTube',
                             style: AppTextStyles.outfit(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w600,
@@ -922,78 +963,115 @@ class _ContributionGraph extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          // ── Grid (animated crossfade between DownTube / commits) ─────
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 600),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.96, end: 1.0).animate(
-                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
-                ),
-                child: child,
-              ),
-            ),
-            child: KeyedSubtree(
-              key: ValueKey(showRealCommits),
-              child: ClipRect(
-            child: LayoutBuilder(
-            builder: (_, constraints) {
-              final cellSize =
-                  ((constraints.maxWidth - (weeks - 1) * 3) / weeks)
-                      .clamp(4.0, 13.0);
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const NeverScrollableScrollPhysics(),
-                child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: List.generate(weeks, (w) {
-                  return Padding(
-                    padding: EdgeInsets.only(right: w < weeks - 1 ? 3 : 0),
-                    child: Column(
-                      children: List.generate(days, (d) {
-                        final idx = w * days + d;
-                        final lvl = idx < contributions.length
-                            ? contributions[idx]
-                            : 0;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 3),
-                          child: Tooltip(
-                            message: showRealCommits
-                                ? (lvl == 0
-                                    ? 'No commits'
-                                    : '$lvl commit${lvl > 1 ? 's' : ''}')
-                                : '',
-                            child: Container(
-                              width: cellSize,
-                              height: cellSize,
-                              decoration: BoxDecoration(
-                                color: _cellColor(lvl, !showRealCommits),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
+          // ── Grid with wave animation ─────────────────────────────────
+          AnimatedBuilder(
+            animation: _waveCtrl,
+            builder: (context, _) {
+              const weeks = 52;
+              const days = 7;
+              // Printer head position: 0 = far left, 52 = far right
+              // We allow a small overshoot so the last column fully settles.
+              final waveFront = _waveCtrl.value * (weeks + 1.5);
+              // Reveal width: how many columns wide the "flash" front is
+              const revealWidth = 1.8;
+
+              return ClipRect(
+                child: LayoutBuilder(
+                  builder: (_, constraints) {
+                    final cellSize =
+                        ((constraints.maxWidth - (weeks - 1) * 3) / weeks)
+                            .clamp(4.0, 13.0);
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const NeverScrollableScrollPhysics(),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: List.generate(weeks, (w) {
+                          // columnReveal: 0 = wave hasn't reached this column
+                          //               1 = wave has fully passed, new state shown
+                          final columnReveal =
+                              ((waveFront - w) / revealWidth).clamp(0.0, 1.0);
+
+                          return Padding(
+                            padding: EdgeInsets.only(right: w < weeks - 1 ? 3 : 0),
+                            child: Column(
+                              children: List.generate(days, (d) {
+                                final idx = w * days + d;
+
+                                // New (target) state
+                                final newLvl = idx < widget.contributions.length
+                                    ? widget.contributions[idx]
+                                    : 0;
+                                final newColor = _cellColor(newLvl, !widget.showRealCommits);
+
+                                // Old (previous) state — shown before wave arrives
+                                final oldLvl = idx < _prevContributions.length
+                                    ? _prevContributions[idx]
+                                    : 0;
+                                final oldColor = _cellColor(oldLvl, _prevLit);
+
+                                // Printer-head color logic:
+                                //   columnReveal = 0   → old state (wave hasn't arrived)
+                                //   columnReveal 0→0.5 → flash bright (wave front passing)
+                                //   columnReveal 0.5→1 → settle to new state
+                                final Color cellColor;
+                                if (columnReveal <= 0.0) {
+                                  cellColor = oldColor;
+                                } else if (columnReveal < 0.5) {
+                                  // Wave arriving: flash from old → bright accent
+                                  final t = Curves.easeOut.transform(columnReveal * 2);
+                                  cellColor = Color.lerp(
+                                    oldColor,
+                                    AppColors.accent,
+                                    t * 0.75,
+                                  )!;
+                                } else {
+                                  // Wave passed: settle bright → new state
+                                  final t = Curves.easeOut.transform(
+                                      ((columnReveal - 0.5) * 2).clamp(0.0, 1.0));
+                                  cellColor = Color.lerp(
+                                    AppColors.accent.withOpacity(0.75),
+                                    newColor,
+                                    t,
+                                  )!;
+                                }
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 3),
+                                  child: Tooltip(
+                                    message: widget.showRealCommits && columnReveal >= 1.0
+                                        ? (newLvl == 0
+                                            ? 'No commits'
+                                            : '$newLvl commit${newLvl > 1 ? 's' : ''}')
+                                        : '',
+                                    child: Container(
+                                      width: cellSize,
+                                      height: cellSize,
+                                      decoration: BoxDecoration(
+                                        color: cellColor,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }),
                             ),
-                          ),
-                        );
-                      }),
-                    ),
-                  );
-                }),
-                ),  // close Row
-              );    // close SingleChildScrollView
+                          );
+                        }),
+                      ),
+                    );
+                  },
+                ),
+              );
             },
           ),
-          ),
-            ),  // KeyedSubtree
-          ),  // AnimatedSwitcher
           const SizedBox(height: 10),
           // ── Footer / legend ──────────────────────────────────────────
           Row(
             children: [
               Flexible(
                 child: Text(
-                showRealCommits
+                widget.showRealCommits
                     ? '347 contributions in the last year'
                     : 'DownTube — built with Flutter & yt-dlp',
                 style: AppTextStyles.outfit(
@@ -1004,7 +1082,7 @@ class _ContributionGraph extends StatelessWidget {
               ),
               ),
               const SizedBox(width: 8),
-              if (showRealCommits) ...[
+              if (widget.showRealCommits) ...[
                 Text('Less',
                     style: AppTextStyles.outfit(
                         fontSize: 9.5, color: AppColors.muted)),

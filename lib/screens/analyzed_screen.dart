@@ -41,6 +41,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
   final ScrollController _qualityScrollCtrl = ScrollController();
   bool _qCanScrollLeft = false;
   bool _qCanScrollRight = false;
+  bool _showFileSize = false;
   // Track last-notified fetch state to avoid duplicate notifications on every
   // notifyListeners() call while the state remains unchanged (e.g. download
   // progress updates keep firing when this screen stays mounted).
@@ -965,6 +966,8 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
           Row(
             children: [
               _sectionLabel('QUALITY'),
+              const SizedBox(width: 8),
+              _fileSizeToggle(),
               const Spacer(),
               _smallArrow(Icons.chevron_left_rounded, _qCanScrollLeft, () => _scrollQuality(-120)),
               const SizedBox(width: 4),
@@ -1121,6 +1124,61 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
       onQualitySelected: (i) => setState(() => _selectedQuality = i),
       scrollController: _qualityScrollCtrl,
       onLayoutChanged: _updateQualityScroll,
+      showSize: _showFileSize,
+    );
+  }
+
+  Widget _fileSizeToggle() {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _showFileSize = !_showFileSize);
+        if (_showFileSize && mounted) {
+          showAppNotification(
+            context,
+            type: NotificationType.info,
+            message: 'Size estimation is in beta',
+            subtitle: 'Sizes are approximate and may not match actual download size. You can see the actual size in the download screen.',
+            duration: const Duration(seconds: 4),
+          );
+        }
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: _showFileSize
+                ? AppColors.accent.withOpacity(0.12)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _showFileSize
+                  ? AppColors.accent.withOpacity(0.45)
+                  : AppColors.border,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _showFileSize ? Icons.data_usage_rounded : Icons.data_usage_outlined,
+                size: 11,
+                color: _showFileSize ? AppColors.accent : AppColors.muted,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Size',
+                style: AppTextStyles.outfit(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: _showFileSize ? AppColors.accent : AppColors.muted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1637,6 +1695,7 @@ class _ScrollableQualityRow extends StatefulWidget {
   final ValueChanged<int> onQualitySelected;
   final ScrollController scrollController;
   final VoidCallback? onLayoutChanged;
+  final bool showSize;
 
   const _ScrollableQualityRow({
     required this.quals,
@@ -1645,6 +1704,7 @@ class _ScrollableQualityRow extends StatefulWidget {
     required this.onQualitySelected,
     required this.scrollController,
     this.onLayoutChanged,
+    this.showSize = false,
   });
 
   @override
@@ -1731,6 +1791,7 @@ class _ScrollableQualityRowState extends State<_ScrollableQualityRow> {
                     size: sizeStr,
                     badge: q.badge,
                     isSelected: widget.selectedQuality == i,
+                    showSize: widget.showSize,
                   ),
                 );
             },
@@ -1749,6 +1810,7 @@ class _QualityTile extends StatefulWidget {
   final String size;
   final String? badge;
   final bool isSelected;
+  final bool showSize;
 
   const _QualityTile({
     required this.res,
@@ -1756,6 +1818,7 @@ class _QualityTile extends StatefulWidget {
     required this.size,
     this.badge,
     required this.isSelected,
+    this.showSize = false,
   });
 
   @override
@@ -1959,20 +2022,21 @@ class _QualityTileState extends State<_QualityTile> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 5),
-                  // File size
-                  Text(
-                    widget.size,
-                    style: AppTextStyles.mono(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color:
-                          sel
-                              ? accent.withValues(alpha: 0.50)
-                              : AppColors.muted2,
+                  // File size (only when toggle enabled)
+                  if (widget.showSize)
+                    Text(
+                      widget.size,
+                      style: AppTextStyles.mono(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color:
+                            sel
+                                ? accent.withValues(alpha: 0.50)
+                                : AppColors.muted2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
                 ],
               ),
             ),

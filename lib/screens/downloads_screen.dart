@@ -60,6 +60,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     const SizedBox(height: AppColors.gap),
                     _buildSessionStats(all),
                     const SizedBox(height: AppColors.gap),
+                    _buildTotalSize(all),
+                    const SizedBox(height: AppColors.gap),
                     _buildSpeedPanel(active),
                     const SizedBox(height: AppColors.gap),
                     _buildQuickAdd(),
@@ -90,6 +92,8 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     child: Column(
                       children: [
                         _buildSessionStats(all),
+                        const SizedBox(height: AppColors.gap),
+                        _buildTotalSize(all),
                         const SizedBox(height: AppColors.gap),
                         _buildSpeedPanel(active),
                         const SizedBox(height: AppColors.gap),
@@ -332,6 +336,53 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: StatTile(value: '$doneToday', label: 'Done Today', unit: ''),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTotalSize(List<DownloadItem> all) {
+    // Sum actual file sizes of actively downloading items
+    int totalBytes = 0;
+    int count = 0;
+    for (final d in all) {
+      if (d.status == DownloadStatus.downloading || d.status == DownloadStatus.done) {
+        final bytes = d.fileSizeBytes;
+        if (bytes > 0) {
+          totalBytes += bytes;
+          count++;
+        }
+      }
+    }
+
+    String sizeStr;
+    if (totalBytes == 0) {
+      sizeStr = '0 B';
+    } else if (totalBytes >= 1e9) {
+      sizeStr = '${(totalBytes / 1e9).toStringAsFixed(2)} GB';
+    } else if (totalBytes >= 1e6) {
+      sizeStr = '${(totalBytes / 1e6).toStringAsFixed(2)} MB';
+    } else if (totalBytes >= 1e3) {
+      sizeStr = '${(totalBytes / 1e3).toStringAsFixed(0)} KB';
+    } else {
+      sizeStr = '$totalBytes B';
+    }
+
+    return SectionCard(
+      title: 'TOTAL SIZE',
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: StatTile(value: sizeStr, label: 'Downloaded', unit: ''),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: StatTile(value: '$count', label: 'With Size', unit: ''),
               ),
             ],
           ),
@@ -700,6 +751,28 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                     ),
                   ],
                   const SizedBox(height: 8),
+                  // Partial file path for error videos
+                  if (item.status == DownloadStatus.error && item.filePath.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Icon(Icons.folder_outlined, size: 10, color: AppColors.muted2),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              _shortPath(item.filePath),
+                              style: AppTextStyles.mono(
+                                fontSize: 9,
+                                color: AppColors.muted2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   // Format + action buttons row
                   Row(
                     children: [
@@ -745,6 +818,12 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
     final path = item.filePath.isNotEmpty ? item.filePath : item.outputPath;
     if (path.isEmpty || !File(path).existsSync()) return;
     Process.run('cmd', ['/c', 'start', '', path]);
+  }
+
+  static String _shortPath(String p) {
+    final parts = p.replaceAll('\\', '/').split('/');
+    if (parts.length >= 2) return '${parts[parts.length - 2]}/${parts.last}';
+    return parts.last;
   }
 
   Widget _buildThumbnail(DownloadItem item, Color accent, bool hovered) {
@@ -858,7 +937,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.refresh_rounded, color: AppColors.red, size: 24),
+                  Icon(Icons.error_outline_rounded, color: AppColors.red, size: 24),
                   const SizedBox(height: 6),
                   Text(
                     'Download failed',
@@ -870,7 +949,7 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Try a single video URL',
+                    'Try again',
                     style: AppTextStyles.outfit(
                       fontSize: 10,
                       color: AppColors.muted,
@@ -878,6 +957,25 @@ class _DownloadGridCardState extends State<_DownloadGridCard> {
                     textAlign: TextAlign.center,
                   ),
                 ],
+              ),
+            ),
+          ),
+        // Play icon hover overlay for done
+        if (hovered && item.status == DownloadStatus.done)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.55),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(AppColors.radius - 1),
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: Colors.white.withOpacity(0.9),
+                  size: 32,
+                ),
               ),
             ),
           ),

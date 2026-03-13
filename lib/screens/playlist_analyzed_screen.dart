@@ -42,6 +42,7 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
   final Map<String, String> _rowQualityOverrides = {};
   bool _selectAll = true;
   PlaylistFetchState _lastState = PlaylistFetchState.idle;
+  bool _showFileSize = false;
 
   static const _qualities = ['Best', '4K', '1440p', '1080p', '720p', '480p', '360p'];
   static const _formats = ['MP4', 'MKV', 'WEBM'];
@@ -442,7 +443,11 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
                         const SizedBox(height: 8),
                         _outputFolderRow(),
                         const SizedBox(height: 8),
-                        _selectedSizeWidget(),
+                        _sizeToggleRow(),
+                        if (_showFileSize) ...[
+                          const SizedBox(height: 8),
+                          _selectedSizeWidget(),
+                        ],
                       ],
                     ),
                   ),
@@ -731,6 +736,87 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
             style: AppTextStyles.outfit(fontSize: 10, color: AppColors.muted),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _sizeToggleRow() {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _showFileSize = !_showFileSize);
+        if (_showFileSize && mounted) {
+          showAppNotification(
+            context,
+            type: NotificationType.info,
+            message: 'Size estimation is in beta',
+            subtitle: 'Sizes are approximate and may not match actual download size. You can see the actual size in the download screen.',
+            duration: const Duration(seconds: 4),
+          );
+        }
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: _showFileSize
+                ? AppColors.accent.withOpacity(0.12)
+                : AppColors.surface2,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(
+              color: _showFileSize
+                  ? AppColors.accent.withOpacity(0.45)
+                  : AppColors.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _showFileSize ? Icons.data_usage_rounded : Icons.data_usage_outlined,
+                size: 14,
+                color: _showFileSize ? AppColors.accent : AppColors.muted,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Show Estimated Size',
+                  style: AppTextStyles.outfit(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _showFileSize ? AppColors.accent : AppColors.text,
+                  ),
+                ),
+              ),
+              Container(
+                width: 32,
+                height: 17,
+                decoration: BoxDecoration(
+                  color: _showFileSize
+                      ? AppColors.accent
+                      : AppColors.border,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 150),
+                  alignment: _showFileSize
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

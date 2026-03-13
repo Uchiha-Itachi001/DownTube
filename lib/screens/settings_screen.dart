@@ -1222,7 +1222,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       Text(
-                        'v2.4.0 - Open Source Video Downloader',
+                        'v2.6.0 - Open Source Video Downloader',
                         style: AppTextStyles.outfit(
                           fontSize: 11,
                           color: AppColors.muted,
@@ -1266,6 +1266,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _releaseItem('SQLite download history'),
                         _releaseItem('Session stats & live speed'),
                         _releaseItem('Smart yt-dlp error handling'),
+                        _releaseItem('Wave animation on credits'),
+                        _releaseItem('Size toggle on quality cards'),
+                        _releaseItem('Total size in downloads screen'),
                       ],
                     ),
                   ],

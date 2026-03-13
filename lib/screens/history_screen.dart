@@ -884,6 +884,13 @@ class _HistoryTileState extends State<_HistoryTile> {
     return '${dt.day}/${dt.month}/${dt.year}';
   }
 
+  /// Formats a full path to "parentFolder/filename.ext" for compact display.
+  static String _shortPath(String p) {
+    final parts = p.replaceAll('\\', '/').split('/');
+    if (parts.length >= 2) return '${parts[parts.length - 2]}/${parts.last}';
+    return parts.last;
+  }
+
   Future<void> _confirmDelete() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -1032,14 +1039,30 @@ class _HistoryTileState extends State<_HistoryTile> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.refresh_rounded, color: AppColors.red, size: 14),
+                              Icon(Icons.error_outline_rounded, color: AppColors.red, size: 14),
                               const SizedBox(height: 2),
                               Text(
-                                'Use single\nvideo URL',
+                                'Failed',
                                 style: AppTextStyles.outfit(fontSize: 8, color: Colors.white),
                                 textAlign: TextAlign.center,
                               ),
                             ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_hovered && success)
+                    Positioned.fill(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          color: Colors.black.withOpacity(0.55),
+                          child: Center(
+                            child: Icon(
+                              Icons.play_circle_fill_rounded,
+                              color: Colors.white.withOpacity(0.9),
+                              size: 22,
+                            ),
                           ),
                         ),
                       ),
@@ -1086,6 +1109,27 @@ class _HistoryTileState extends State<_HistoryTile> {
                       ],
                     ],
                   ),
+                  // Partial file path for error videos
+                  if (!success && item.filePath.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(Icons.folder_outlined, size: 10, color: AppColors.muted2),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            _shortPath(item.filePath),
+                            style: AppTextStyles.mono(
+                              fontSize: 9,
+                              color: AppColors.muted2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 1),
                   Text(
                     time,

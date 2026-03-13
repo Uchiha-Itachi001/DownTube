@@ -517,18 +517,18 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       item.status = DownloadStatus.error;
       item.errorMessage = e.toString();
-      // Persist failed downloads so they survive a restart and appear in
-      // history. They are never touched by cleanMissing() and can only be
-      // removed by explicit delete.
-      // Error downloads: don't store file path, delete leftover partial files
+      // Store partial file path so user can delete leftovers from history.
+      // Previously we auto-deleted and set filePath='', but this missed
+      // locked files and .part companions.
       final partialPath = _mergeDest ?? _ffmpegDest ?? _firstDest ?? '';
+      item.filePath = partialPath;
+      // Also try to clean up .part companion file
       if (partialPath.isNotEmpty) {
         try {
-          final f = File(partialPath);
-          if (await f.exists()) await f.delete();
+          final partFile = File('$partialPath.part');
+          if (await partFile.exists()) await partFile.delete();
         } catch (_) {}
       }
-      item.filePath = ''; // never store path for failed downloads
       await DownloadDb.removeActive(item.id);
       await DownloadDb.save(item);
       pendingNotifications.add(DownloadNotification(
@@ -580,7 +580,10 @@ class AppState extends ChangeNotifier {
     downloads[idx].phase = DownloadPhase.complete;
     downloads[idx].errorMessage = 'Cancelled';
     downloads[idx].progress = 0.0;
-    downloads[idx].filePath = '';
+    // Store partial path so user can delete leftover from history
+    if (partialPath.isNotEmpty) {
+      downloads[idx].filePath = partialPath;
+    }
     downloads[idx].partialPath = '';
     // Remove from active tracking and persist the cancelled item
     await DownloadDb.removeActive(id);
