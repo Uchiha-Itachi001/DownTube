@@ -75,6 +75,11 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   double get _progressValue {
+    if (AppState.instance.ytDlpUpdating) {
+      final p = AppState.instance.ytDlpDownloadProgress;
+      if (p < 0) return 0.45; // indeterminate
+      return 0.35 + (p * 0.20);
+    }
     switch (_startup.stage) {
       case StartupStage.checking:
         return 0.35;
@@ -222,21 +227,22 @@ class _SplashScreenState extends State<SplashScreen>
           ),
           // Icon image
           Container(
-            width: 68,
-            height: 68,
+            width: 76,
+            height: 76,
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
               color: AppColors.bg,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: AppColors.accent.withOpacity(0.55),
                 width: 2,
               ),
             ),
-            child: ClipOval(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
               child: Padding(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 child: Image.asset(
-                  'assetes/images/icon.png',
+                  'assetes/icon/icon.png',
                   fit: BoxFit.contain,
                 ),
               ),
@@ -283,10 +289,14 @@ class _SplashScreenState extends State<SplashScreen>
 
   Widget _buildStatusRow() {
     final isDone = _startup.stage == StartupStage.ready;
+    final state = AppState.instance;
+    final statusMsg = state.ytDlpUpdating
+        ? 'Downloading yt-dlp engine… ${state.ytDlpDownloadProgress > 0 ? "(${(state.ytDlpDownloadProgress * 100).toStringAsFixed(0)}%)" : ""}'
+        : _startup.statusMessage;
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
       child: Row(
-        key: ValueKey(_startup.statusMessage),
+        key: ValueKey(statusMsg),
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isDone)
@@ -303,7 +313,7 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           const SizedBox(width: 8),
           Text(
-            _startup.statusMessage,
+            statusMsg,
             style: AppTextStyles.outfit(
               fontSize: 12,
               color: AppColors.muted,
@@ -422,7 +432,7 @@ class _YtDlpMissingPanelState extends State<_YtDlpMissingPanel> {
 
   Future<void> _pickFile() async {
     setState(() => _picking = true);
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       dialogTitle: 'Locate yt-dlp.exe',
       type: FileType.custom,
       allowedExtensions: ['exe'],
@@ -605,7 +615,7 @@ class _UserSetupPanelState extends State<_UserSetupPanel> {
   }
 
   Future<void> _pickPicture() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.image,
       allowMultiple: false,
     );

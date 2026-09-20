@@ -25,6 +25,13 @@ class AppHeader extends StatefulWidget {
 }
 
 class _AppHeaderState extends State<AppHeader> {
+  bool _cursorOnPill = false;
+  bool _cursorOnPillOverlay = false;
+  OverlayEntry? _pillOverlayEntry;
+  final LayerLink _pillLayerLink = LayerLink();
+
+  bool get _pillHovered => _cursorOnPill || _cursorOnPillOverlay;
+
   @override
   void initState() {
     super.initState();
@@ -35,8 +42,58 @@ class _AppHeaderState extends State<AppHeader> {
     if (mounted) setState(() {});
   }
 
+  void _onPillEnter() {
+    _cursorOnPill = true;
+    if (_pillOverlayEntry == null) _showPillOverlay();
+    setState(() {});
+  }
+
+  void _onPillExit() {
+    _cursorOnPill = false;
+    _schedulePillHide();
+  }
+
+  void _onPillOverlayEnter() {
+    if (!_cursorOnPillOverlay) {
+      _cursorOnPillOverlay = true;
+      setState(() {});
+    }
+  }
+
+  void _onPillOverlayExit() {
+    _cursorOnPillOverlay = false;
+    _schedulePillHide();
+  }
+
+  void _schedulePillHide() {
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (!mounted) return;
+      if (!_pillHovered) {
+        _removePillOverlay();
+        setState(() {});
+      }
+    });
+  }
+
+  void _showPillOverlay() {
+    _pillOverlayEntry = OverlayEntry(
+      builder: (_) => _EnginePillOverlay(
+        link: _pillLayerLink,
+        onEnter: _onPillOverlayEnter,
+        onExit: _onPillOverlayExit,
+      ),
+    );
+    Overlay.of(context).insert(_pillOverlayEntry!);
+  }
+
+  void _removePillOverlay() {
+    _pillOverlayEntry?.remove();
+    _pillOverlayEntry = null;
+  }
+
   @override
   void dispose() {
+    _removePillOverlay();
     AppState.instance.removeListener(_onEngineChange);
     super.dispose();
   }
@@ -72,46 +129,81 @@ class _AppHeaderState extends State<AppHeader> {
   Widget _buildEnginePill() {
     final ready = AppState.instance.ytDlpReady;
     final version = AppState.instance.ytDlpVersion;
-    final label = ready ? 'Engine Ready' : 'Engine Offline';
-    final sub =
-        ready
-            ? (version != null ? 'yt-dlp $version' : 'yt-dlp ready')
-            : 'yt-dlp not found';
-    final color = ready ? AppColors.accent : AppColors.red;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: ready ? AppColors.accentDim : AppColors.red.withOpacity(0.08),
-        border: Border.all(color: color.withOpacity(0.25)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _PulsingDot(color: color),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: AppTextStyles.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: color,
+    final updateAvailable = AppState.instance.ytDlpUpdateAvailable;
+    final updating = AppState.instance.ytDlpUpdating;
+
+    final String label;
+    final String sub;
+    final Color color;
+    final Color bg;
+
+    if (!ready) {
+      label = 'Engine Offline';
+      sub = 'yt-dlp not found';
+      color = AppColors.red;
+      bg = AppColors.red.withOpacity(0.08);
+    } else if (updating) {
+      label = 'Updating Engine';
+      sub = version != null ? 'yt-dlp $version' : 'yt-dlp updating';
+      color = Colors.orange;
+      bg = Colors.orange.withOpacity(0.08);
+    } else if (updateAvailable) {
+      label = 'Needs Update';
+      sub = version != null ? 'yt-dlp $version' : 'yt-dlp outdated';
+      color = Colors.orange;
+      bg = Colors.orange.withOpacity(0.08);
+    } else {
+      label = 'Engine Ready';
+      sub = version != null ? 'yt-dlp $version' : 'yt-dlp ready';
+      color = AppColors.accent;
+      bg = AppColors.accentDim;
+    }
+
+    return CompositedTransformTarget(
+      link: _pillLayerLink,
+      child: MouseRegion(
+        onEnter: (_) => _onPillEnter(),
+        onExit: (_) => _onPillExit(),
+        cursor: SystemMouseCursors.basic,
+        child: _PulsingWrapper(
+          active: ready && (updateAvailable || updating),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: bg,
+              border: Border.all(color: color.withOpacity(0.25)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _PulsingDot(color: color),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: AppTextStyles.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      sub,
+                      style: AppTextStyles.outfit(
+                        fontSize: 10,
+                        color: color.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                sub,
-                style: AppTextStyles.outfit(
-                  fontSize: 10,
-                  color: color.withOpacity(0.6),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -952,7 +1044,275 @@ class _DropHistoryRow extends StatelessWidget {
   }
 }
 
+class _EnginePillOverlay extends StatelessWidget {
+  final LayerLink link;
+  final VoidCallback onEnter;
+  final VoidCallback onExit;
 
+  const _EnginePillOverlay({
+    required this.link,
+    required this.onEnter,
+    required this.onExit,
+  });
 
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformFollower(
+      link: link,
+      targetAnchor: Alignment.bottomLeft,
+      followerAnchor: Alignment.topLeft,
+      offset: const Offset(0, 6),
+      showWhenUnlinked: false,
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: MouseRegion(
+          onEnter: (_) => onEnter(),
+          onExit: (_) => onExit(),
+          child: const _EngineOverlayContent(),
+        ),
+      ),
+    );
+  }
+}
+
+class _EngineOverlayContent extends StatelessWidget {
+  const _EngineOverlayContent();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppState.instance,
+      builder: (context, _) {
+        final state = AppState.instance;
+        final current = state.ytDlpVersion ?? 'Unknown';
+        final latest = state.latestYtDlpVersion ?? 'Checking...';
+        final outdated = state.ytDlpUpdateAvailable;
+        final updating = state.ytDlpUpdating;
+        
+        return Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            width: 220,
+            decoration: BoxDecoration(
+              color: AppColors.surface1,
+              border: Border.all(
+                color: outdated ? Colors.orange.withOpacity(0.4) : AppColors.accent.withOpacity(0.3),
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.4),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'yt-dlp Engine Status',
+                  style: AppTextStyles.syne(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.text,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Current Version:',
+                      style: AppTextStyles.outfit(
+                        fontSize: 11,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                    Text(
+                      current,
+                      style: AppTextStyles.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Latest Version:',
+                      style: AppTextStyles.outfit(
+                        fontSize: 11,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                    Text(
+                      latest,
+                      style: AppTextStyles.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.text,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(height: 1, color: AppColors.border),
+                const SizedBox(height: 8),
+                if (updating)
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.2,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Updating in background...',
+                          style: AppTextStyles.outfit(
+                            fontSize: 10,
+                            color: Colors.orange,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (outdated)
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.orange),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Update available',
+                          style: AppTextStyles.outfit(
+                            fontSize: 10,
+                            color: Colors.orange,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else if (!state.ytDlpReady)
+                  Row(
+                    children: [
+                      const Icon(Icons.error_outline_rounded, size: 12, color: AppColors.red),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Offline - Install required',
+                          style: AppTextStyles.outfit(
+                            fontSize: 10,
+                            color: AppColors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      Icon(Icons.check_circle_outline_rounded, size: 12, color: AppColors.accent),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Up to date',
+                          style: AppTextStyles.outfit(
+                            fontSize: 10,
+                            color: AppColors.accent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PulsingWrapper extends StatefulWidget {
+  final Widget child;
+  final bool active;
+  const _PulsingWrapper({required this.child, required this.active});
+
+  @override
+  State<_PulsingWrapper> createState() => _PulsingWrapperState();
+}
+
+class _PulsingWrapperState extends State<_PulsingWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 0.45, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    if (widget.active) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _PulsingWrapper oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active != oldWidget.active) {
+      if (widget.active) {
+        _controller.repeat(reverse: true);
+      } else {
+        _controller.stop();
+        _controller.value = 1.0;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.active) return widget.child;
+
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _animation.value,
+          child: child,
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
 
 

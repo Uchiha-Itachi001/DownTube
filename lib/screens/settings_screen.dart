@@ -7,6 +7,7 @@ import '../models/download_item.dart';
 import '../providers/app_state.dart';
 import '../widgets/app_notification.dart';
 import '../widgets/toggle_switch.dart';
+import '../startup/splash_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onReload;
@@ -1164,12 +1165,106 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+        const SizedBox(height: 24),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: GestureDetector(
+            onTap: () async {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  backgroundColor: AppColors.surface1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: AppColors.border),
+                  ),
+                  title: Text(
+                    'Log Out & Reset Profile',
+                    style: AppTextStyles.syne(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  content: Text(
+                    'This will erase your locally stored profile name and picture. Your download history will not be affected. Do you wish to proceed?',
+                    style: AppTextStyles.outfit(
+                      fontSize: 13,
+                      color: AppColors.muted,
+                      height: 1.5,
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        'Cancel',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await AppState.instance.clearUserProfile();
+                        if (context.mounted) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SplashScreen(),
+                            ),
+                          );
+                        }
+                      },
+                      child: Text(
+                        'Log Out',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.red,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.red.withOpacity(0.1),
+                  border: Border.all(color: AppColors.red.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.logout_rounded, size: 16, color: AppColors.red),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Log Out',
+                      style: AppTextStyles.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
 
   Future<void> _pickProfilePicture() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.image,
       allowMultiple: false,
     );
@@ -1222,7 +1317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       Text(
-                        'v2.6.0 - Open Source Video Downloader',
+                        'v2.7.0 - Open Source Video Downloader',
                         style: AppTextStyles.outfit(
                           fontSize: 11,
                           color: AppColors.muted,
@@ -1281,30 +1376,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
         // yt-dlp engine info
         _settingRow(
           'yt-dlp Engine',
-          state.ytDlpReady
-              ? 'Version: ${state.ytDlpVersion ?? "Unknown"}'
-              : 'Engine not found',
+          state.ytDlpUpdating
+              ? 'Updating to ${state.latestYtDlpVersion ?? "latest"}… ${state.ytDlpDownloadProgress > 0 ? "(${(state.ytDlpDownloadProgress * 100).toStringAsFixed(0)}%)" : ""}'
+              : state.ytDlpUpdateError != null
+                  ? 'Update failed: ${state.ytDlpUpdateError}'
+                  : state.ytDlpReady
+                      ? 'Version: ${state.ytDlpVersion ?? "Unknown"}${state.latestYtDlpVersion != null && state.ytDlpVersion != state.latestYtDlpVersion ? " (Latest: ${state.latestYtDlpVersion})" : ""}'
+                      : 'Engine not found',
           icon: Icons.engineering_rounded,
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: state.ytDlpReady ? AppColors.accent : AppColors.red,
-                  shape: BoxShape.circle,
+              if (state.ytDlpUpdating)
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: AppColors.accent,
+                  ),
+                )
+              else ...[
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: !state.ytDlpReady
+                        ? AppColors.red
+                        : state.ytDlpUpdateAvailable
+                            ? Colors.orange
+                            : AppColors.accent,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                state.ytDlpReady ? 'Ready' : 'Offline',
-                style: AppTextStyles.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: state.ytDlpReady ? AppColors.accent : AppColors.red,
+                const SizedBox(width: 8),
+                Text(
+                  !state.ytDlpReady
+                      ? 'Offline'
+                      : state.ytDlpUpdateAvailable
+                          ? 'Needs Update'
+                          : 'Ready',
+                  style: AppTextStyles.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: !state.ytDlpReady
+                        ? AppColors.red
+                        : state.ytDlpUpdateAvailable
+                            ? Colors.orange
+                            : AppColors.accent,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -1319,7 +1441,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.accent.withOpacity(0.7)),
+                  Icon(Icons.lock_outline_rounded, size: 12, color: state.ytDlpReady ? AppColors.accent.withOpacity(0.7) : AppColors.red.withOpacity(0.7)),
                   const SizedBox(width: 6),
                   IgnorePointer(
                     child: ToggleSwitch(value: true, onChanged: null),
@@ -1836,7 +1958,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: () async {
-          final picked = await FilePicker.platform.getDirectoryPath();
+          final picked = await FilePicker.getDirectoryPath();
           if (picked != null) {
             setState(() => _pendingDownloadPath = picked);
           }

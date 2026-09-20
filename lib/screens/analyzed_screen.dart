@@ -1557,7 +1557,7 @@ class _AnalyzedScreenState extends State<AnalyzedScreen> {
 
   // Output folder picker
   Future<void> _pickOutputFolder() async {
-    final result = await FilePicker.platform.getDirectoryPath(
+    final result = await FilePicker.getDirectoryPath(
       initialDirectory: _outputPath,
       dialogTitle: 'Choose output folder',
     );

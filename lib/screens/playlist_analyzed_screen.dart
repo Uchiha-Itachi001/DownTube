@@ -311,7 +311,7 @@ class _PlaylistAnalyzedScreenState extends State<PlaylistAnalyzedScreen> {
   }
 
   Future<void> _pickOutputFolder() async {
-    final result = await FilePicker.platform.getDirectoryPath();
+    final result = await FilePicker.getDirectoryPath();
     if (result != null) setState(() => _outputPath = result);
   }
 

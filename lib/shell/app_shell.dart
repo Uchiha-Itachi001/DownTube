@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
+import '../core/app_text_styles.dart';
 import '../providers/app_state.dart';
 import '../services/notification_service.dart';
 import '../widgets/sidebar.dart';
@@ -29,6 +30,7 @@ class _AppShellState extends State<AppShell>
   int _screenRefreshKey = 0; // incremented to force screen refresh
   bool _isRefreshing = false;
   late AnimationController _refreshSpinCtrl;
+  bool _hasPromptedUpdate = false;
 
   void _onNavSelected(int index) => setState(() => _selectedIndex = index);
 
@@ -65,13 +67,162 @@ class _AppShellState extends State<AppShell>
       duration: const Duration(milliseconds: 800),
     );
     AppState.instance.addListener(_drainNotifications);
+    AppState.instance.addListener(_checkUpdateAvailablePrompt);
+    // Initial check in case it is already loaded
+    _checkUpdateAvailablePrompt();
   }
 
   @override
   void dispose() {
     AppState.instance.removeListener(_drainNotifications);
+    AppState.instance.removeListener(_checkUpdateAvailablePrompt);
     _refreshSpinCtrl.dispose();
     super.dispose();
+  }
+
+  void _checkUpdateAvailablePrompt() {
+    final state = AppState.instance;
+    if (state.ytDlpReady && state.ytDlpUpdateAvailable && !_hasPromptedUpdate && !state.ytDlpUpdating) {
+      _hasPromptedUpdate = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showUpdateDialog(context);
+      });
+    }
+  }
+
+  void _showUpdateDialog(BuildContext context) {
+    final state = AppState.instance;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface1,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.border),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.system_update_rounded, color: Colors.orange, size: 24),
+            const SizedBox(width: 10),
+            Text(
+              'Engine Update Available',
+              style: AppTextStyles.syne(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'A newer version of the yt-dlp download engine is available. Updating ensures the best compatibility and download speeds.',
+              style: AppTextStyles.outfit(
+                fontSize: 13,
+                color: AppColors.muted,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Column(
+                    children: [
+                      Text(
+                        'CURRENT',
+                        style: AppTextStyles.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.muted2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        state.ytDlpVersion ?? 'Unknown',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.text,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(width: 1, height: 30, color: AppColors.border),
+                  Column(
+                    children: [
+                      Text(
+                        'LATEST',
+                        style: AppTextStyles.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        state.latestYtDlpVersion ?? 'Unknown',
+                        style: AppTextStyles.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Later',
+              style: AppTextStyles.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.muted,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              AppState.instance.checkAndUpdateYtDlp(silent: false);
+            },
+            child: Text(
+              'Update Now',
+              style: AppTextStyles.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _drainNotifications() {
@@ -368,50 +519,49 @@ class _LogoBox extends StatelessWidget {
         child: SizedBox(
           width: width,
           child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child:
-            collapsed
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: collapsed
                 ? Center(
-                  child: SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(
-                        'assetes/images/icon.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                )
-                : Row(
-                  children: [
-                    SizedBox(
-                      width: 32,
-                      height: 32,
+                    child: SizedBox(
+                      width: 38,
+                      height: 38,
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.asset(
-                          'assetes/images/icon.png',
+                          'assetes/icon/icon.png',
                           fit: BoxFit.contain,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        'DownTube',
-                        style: const TextStyle(
-                          fontFamily: 'Syne',
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
-                          color: AppColors.text,
+                  )
+                : Row(
+                    children: [
+                      SizedBox(
+                        width: 38,
+                        height: 38,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.asset(
+                            'assetes/icon/icon.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          'DownTube',
+                          style: const TextStyle(
+                            fontFamily: 'Syne',
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: AppColors.text,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ),

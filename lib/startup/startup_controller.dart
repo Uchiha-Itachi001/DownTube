@@ -27,10 +27,22 @@ class StartupController extends ChangeNotifier {
     await AppState.instance.init();
 
     if (!AppState.instance.ytDlpReady) {
-      stage = StartupStage.ytDlpMissing;
-      statusMessage = 'yt-dlp not found';
-      notifyListeners();
-      return;
+      if (AppState.instance.autoUpdateYtDlp) {
+        statusMessage = 'Downloading yt-dlp engine…';
+        notifyListeners();
+        final success = await AppState.instance.checkAndUpdateYtDlp(silent: false);
+        if (!success || !AppState.instance.ytDlpReady) {
+          stage = StartupStage.ytDlpMissing;
+          statusMessage = 'yt-dlp download failed';
+          notifyListeners();
+          return;
+        }
+      } else {
+        stage = StartupStage.ytDlpMissing;
+        statusMessage = 'yt-dlp not found';
+        notifyListeners();
+        return;
+      }
     }
 
     statusMessage = 'Loading download history…';

@@ -47,6 +47,8 @@ class AppState extends ChangeNotifier {
   bool ytDlpUpdating = false;
   /// 0..1 progress of an in-progress yt-dlp download (or -1 = indeterminate).
   double ytDlpDownloadProgress = 0.0;
+  /// Error message if the update process fails.
+  String? ytDlpUpdateError;
   String? downloadPath;
 
   // Theme color (accent)
@@ -184,7 +186,7 @@ class AppState extends ChangeNotifier {
     embedSubs = _prefs!.embedSubs;
     saveThumbnail = _prefs!.saveThumbnail;
     addChapters = _prefs!.addChapters;
-    autoUpdateYtDlp = _prefs!.autoUpdateYtDlp;
+    autoUpdateYtDlp = true;
     notificationsEnabled = _prefs!.notifications;
     soundEffects = _prefs!.soundEffects;
     defaultQuality = _prefs!.defaultQuality;
@@ -780,11 +782,24 @@ class AppState extends ChangeNotifier {
   ///
   /// [silent] = true  : background call, only notifies when done
   /// [silent] = false : called by user (Settings), updates progress in realtime
-  Future<void> checkAndUpdateYtDlp({bool silent = false}) async {
-    if (ytDlpUpdating) return; // already running
+  Future<bool> checkAndUpdateYtDlp({bool silent = false}) async {
+    if (ytDlpUpdating) return false; // already running
+
+    ytDlpUpdateError = null;
+    if (!silent) notifyListeners();
+
+    if (_activeDownloadCount > 0) {
+      ytDlpUpdateError = "Cannot update yt-dlp while a download is active.";
+      if (!silent) notifyListeners();
+      return false;
+    }
 
     final latest = await ytDlp.checkLatestVersion();
-    if (latest == null) return; // network/API failure
+    if (latest == null) {
+      ytDlpUpdateError = "Network error: Failed to check for latest yt-dlp version.";
+      if (!silent) notifyListeners();
+      return false; // network/API failure
+    }
 
     latestYtDlpVersion = latest;
     final current = ytDlpVersion;
@@ -792,23 +807,18 @@ class AppState extends ChangeNotifier {
 
     if (!ytDlpUpdateAvailable) {
       notifyListeners();
-      return;
-    }
-
-    if (!autoUpdateYtDlp && silent) {
-      // Just flag it — let the user decide from Settings
-      notifyListeners();
-      return;
+      return true;
     }
 
     // Proceed with download
-    await _doYtDlpUpdate(silent: silent);
+    return await _doYtDlpUpdate(silent: silent);
   }
 
   /// Download and install the latest yt-dlp.exe to the app data folder.
-  Future<void> _doYtDlpUpdate({bool silent = false}) async {
+  Future<bool> _doYtDlpUpdate({bool silent = false}) async {
     ytDlpUpdating = true;
     ytDlpDownloadProgress = 0.0;
+    ytDlpUpdateError = null;
     if (!silent) notifyListeners();
 
     final targetPath = YtDlpService.defaultInstallPath;
@@ -830,12 +840,15 @@ class AppState extends ChangeNotifier {
       ytDlpVersion = await ytDlp.getVersion();
       ytDlpUpdateAvailable = false;
       await _prefs?.setYtDlpPath(targetPath);
+    } else {
+      ytDlpUpdateError = "Failed to write yt-dlp executable. It may be locked by another process.";
     }
     notifyListeners();
+    return success;
   }
 
   /// Called from the Settings screen "Check for update" button.
-  Future<void> manualCheckYtDlpUpdate() =>
+  Future<bool> manualCheckYtDlpUpdate() =>
       checkAndUpdateYtDlp(silent: false);
 
   // User profile setters
@@ -858,6 +871,18 @@ class AppState extends ChangeNotifier {
   Future<void> setUserProfilePicture(String path) async {
     userProfilePic = path;
     await _prefs?.setUserProfilePic(path);
+    notifyListeners();
+  }
+
+  Future<void> clearUserProfile() async {
+    userFirstName = null;
+    userLastName = null;
+    userProfilePic = null;
+    userSetupDone = false;
+    await _prefs?.setUserFirstName('');
+    await _prefs?.setUserLastName('');
+    await _prefs?.setUserProfilePic('');
+    await _prefs?.setUserSetupDone(false);
     notifyListeners();
   }
 
@@ -887,8 +912,8 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> setAutoUpdateYtDlp(bool v) async {
-    autoUpdateYtDlp = v;
-    await _prefs?.setAutoUpdateYtDlp(v);
+    autoUpdateYtDlp = true;
+    await _prefs?.setAutoUpdateYtDlp(true);
     notifyListeners();
   }
 

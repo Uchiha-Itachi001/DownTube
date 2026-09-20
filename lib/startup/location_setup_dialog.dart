@@ -37,7 +37,7 @@ class _LocationSetupDialogState extends State<LocationSetupDialog>
 
   Future<void> _pickFolder() async {
     setState(() => _picking = true);
-    final path = await FilePicker.platform.getDirectoryPath(
+    final path = await FilePicker.getDirectoryPath(
       dialogTitle: 'Select download folder',
     );
     setState(() {
