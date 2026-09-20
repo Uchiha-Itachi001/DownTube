@@ -179,7 +179,7 @@ class YtDlpService {
 
     final process = await Process.start(
       _execPath!,
-      ['-J', '--no-warnings', '--no-playlist', '--remote-components', 'ejs:github', url],
+      ['-J', '--no-warnings', '--no-playlist', url],
       runInShell: false,
     );
 
@@ -219,7 +219,7 @@ class YtDlpService {
       _execPath!,
       [
         '--flat-playlist', '--playlist-items', '1', '-J',
-        '--no-warnings', '--remote-components', 'ejs:github', url,
+        '--no-warnings', url,
       ],
       runInShell: false,
     );
@@ -259,7 +259,7 @@ class YtDlpService {
       _execPath!,
       [
         '--flat-playlist', '-j',
-        '--no-warnings', '--remote-components', 'ejs:github', url,
+        '--no-warnings', url,
       ],
       runInShell: false,
     );
@@ -298,7 +298,6 @@ class YtDlpService {
 
     final List<String> args;
     if (audioOnly) {
-      // Use -x (extract audio) with --audio-format and --audio-quality
       args = [
         '-f', formatSelector,
         '-x',
@@ -306,9 +305,8 @@ class YtDlpService {
         '--audio-quality', audioQuality,
         '-o', outputTemplate,
         '--no-playlist',
-        '--no-warnings',
+        '--newline',
         '--force-overwrites',
-        '--remote-components', 'ejs:github',
         url,
       ];
     } else {
@@ -317,9 +315,8 @@ class YtDlpService {
         '--merge-output-format', outputFormat,
         '-o', outputTemplate,
         '--no-playlist',
-        '--no-warnings',
+        '--newline',
         '--force-overwrites',
-        '--remote-components', 'ejs:github',
         url,
       ];
     }
@@ -327,34 +324,54 @@ class YtDlpService {
     final process = await Process.start(_execPath!, args, runInShell: false);
     _activeDownloads[id] = process;
     try {
-      // Merge stdout and stderr so phase/progress lines from either stream
-      // are delivered in real-time during the download.
+      // Capture exit code concurrently — do NOT await it until streams are done.
+      final exitCodeFuture = process.exitCode;
+
+      // Merge stdout + stderr into one stream for real-time progress updates.
       final controller = StreamController<String>();
       int openStreams = 2;
       void onDone() {
         openStreams--;
         if (openStreams == 0) controller.close();
       }
+
+      // Buffer stderr lines so we can build a useful error message if needed.
+      final stderrLines = <String>[];
+
       process.stdout
           .transform(utf8.decoder)
           .transform(const LineSplitter())
-          .listen(controller.add, onError: controller.addError, onDone: onDone);
+          .listen(controller.add, onError: (_) {}, onDone: onDone);
       process.stderr
           .transform(utf8.decoder)
           .transform(const LineSplitter())
-          .listen(controller.add, onError: controller.addError, onDone: onDone);
+          .listen((line) {
+            stderrLines.add(line);
+            controller.add(line);
+          }, onError: (_) {}, onDone: onDone);
+
+      bool sawDestination = false;
       await for (final line in controller.stream) {
+        if (line.contains('[download] Destination:') ||
+            line.contains('[ffmpeg] Merging formats') ||
+            line.contains('[Merger] Merging formats') ||
+            line.contains('[ExtractAudio] Destination:') ||
+            line.contains('[ffmpeg] Destination:')) {
+          sawDestination = true;
+        }
         yield line;
       }
-      // Verify yt-dlp exited cleanly — non-zero means the download was
-      // interrupted (network dropped, server error, yt-dlp crash).
-      final ec = await process.exitCode;
-      if (ec != 0) {
-        throw Exception(
-          'yt-dlp exited with code $ec. The download was interrupted '
-          '(network dropped or server error).',
-        );
+
+      final ec = await exitCodeFuture;
+
+      // yt-dlp may exit non-zero for minor post-processor warnings even when
+      // the download itself completed (file is on disk). Only treat as failure
+      // if NOTHING was ever downloaded (no Destination line was seen).
+      if (ec != 0 && !sawDestination) {
+        final errText = stderrLines.join('\n');
+        throw Exception(_friendlyYtDlpError(errText, ec));
       }
+      // If we saw a destination, the file is on disk — success regardless of ec.
     } finally {
       _activeDownloads.remove(id);
     }

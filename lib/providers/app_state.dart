@@ -534,16 +534,21 @@ class AppState extends ChangeNotifier {
       item.eta = null;
       // Store the actual output file path so DB can detect when user deletes it
       item.filePath = _mergeDest ?? _ffmpegDest ?? _firstDest ?? '';
-      // If stored path doesn't exist, scan output dir for the actual file
-      if (item.filePath.isNotEmpty && !File(item.filePath).existsSync()) {
-        final dir = Directory(effectivePath);
-        if (dir.existsSync()) {
-          final candidates = dir
+      // If stored path doesn't exist or is empty, scan output dir for the actual file
+      // (yt-dlp may rename/remux the final file differently than the template)
+      if (!File(item.filePath).existsSync()) {
+        final scanDir = Directory(effectivePath);
+        if (scanDir.existsSync()) {
+          final candidates = scanDir
               .listSync()
               .whereType<File>()
               .where((f) => f.statSync().modified.isAfter(
-                    DateTime.now().subtract(const Duration(minutes: 5)),
+                    DateTime.now().subtract(const Duration(minutes: 30)),
                   ))
+              .where((f) {
+                final ext = f.path.split('.').last.toLowerCase();
+                return ['mp4', 'mkv', 'webm', 'mp3', 'wav', 'flac', 'm4a', 'opus'].contains(ext);
+              })
               .toList();
           if (candidates.isNotEmpty) {
             candidates.sort(

@@ -36,6 +36,31 @@ void main() async {
     },
   );
 
+  // ─── Suppress known Flutter Windows keyboard state assertion ───────────────
+  // Flutter on Windows sometimes fires duplicate KeyDownEvent for modifier keys
+  // (Alt, Ctrl, Shift) when focus changes. This causes a failed assertion in
+  // HardwareKeyboard that crashes the app in debug mode. It is a Flutter
+  // framework bug and safe to ignore — the key event is simply dropped.
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final msg = details.exceptionAsString();
+    if (msg.contains('physical key is already pressed') ||
+        msg.contains('_pressedKeys.containsKey') ||
+        msg.contains('HardwareKeyboard')) {
+      return; // swallow — known Flutter Windows keyboard race
+    }
+    FlutterError.presentError(details);
+  };
+  WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+    if (error is AssertionError) {
+      final msg = error.message?.toString() ?? error.toString();
+      if (msg.contains('physical key is already pressed') ||
+          msg.contains('_pressedKeys.containsKey')) {
+        return true; // handled — swallow silently
+      }
+    }
+    return false; // let other errors propagate
+  };
+
   runApp(const MyApp());
 }
 

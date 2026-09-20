@@ -67,3 +67,9 @@ truncate_file.py
 
 # Windows build ephemeral
 windows/flutter/ephemeral/
+
+# AI Agent Tooling & Memory
+.agents/
+skills/
+MEMORY.md
+ARCHITECTURE.md
