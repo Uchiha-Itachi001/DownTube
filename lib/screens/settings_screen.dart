@@ -1317,7 +1317,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       Text(
-                        'v2.7.0 - Open Source Video Downloader',
+                        'v2.7.1 - Open Source Video Downloader',
                         style: AppTextStyles.outfit(
                           fontSize: 11,
                           color: AppColors.muted,
