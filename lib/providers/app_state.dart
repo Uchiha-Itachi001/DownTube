@@ -9,6 +9,8 @@ import '../services/prefs_service.dart';
 import '../services/ytdlp_service.dart';
 import '../services/download_db.dart';
 import '../services/connectivity_service.dart';
+import '../services/app_update_service.dart';
+import '../core/app_version.dart';
 
 enum FetchState { idle, loading, success, error }
 
@@ -50,6 +52,21 @@ class AppState extends ChangeNotifier {
   /// Error message if the update process fails.
   String? ytDlpUpdateError;
   String? downloadPath;
+
+  // ── App self-update ────────────────────────────────────────────────────────
+  /// Current installed version — single source of truth is [AppVersion.current].
+  static String get appVersion => AppVersion.current;
+  final AppUpdateService _appUpdater = AppUpdateService();
+  /// Latest app version tag from GitHub (null until first check).
+  String? latestAppVersion;
+  /// True when a newer app version is available on GitHub.
+  bool appUpdateAvailable = false;
+  /// True while the installer is being downloaded.
+  bool appUpdating = false;
+  /// 0..1 download progress of the new installer.
+  double appUpdateProgress = 0.0;
+  /// Human-readable error if the download fails.
+  String? appUpdateError;
 
   // Theme color (accent)
   Color themeColor = AppColors.accent;
@@ -206,6 +223,8 @@ class AppState extends ChangeNotifier {
     // If autoUpdateYtDlp is on, download and install automatically.
     // If off, just record the latest version so the Settings screen can show it.
     _scheduleYtDlpUpdateCheck();
+    // Check for a new DownTube app version in the background (3 retries, silent).
+    Future.microtask(checkAppVersion);
 
     // Load persisted download history from SQLite
     await _loadHistory();
@@ -855,6 +874,75 @@ class AppState extends ChangeNotifier {
   /// Called from the Settings screen "Check for update" button.
   Future<bool> manualCheckYtDlpUpdate() =>
       checkAndUpdateYtDlp(silent: false);
+
+  // ── App self-update methods ───────────────────────────────────────────────
+
+  /// Background startup check — fetches latest tag from GitHub.
+  /// Sets [appUpdateAvailable] and notifies on completion; silent on failure.
+  Future<void> checkAppVersion() async {
+    final latest = await _appUpdater.checkLatestVersion();
+    if (latest == null) return; // network failure — app unaffected
+    latestAppVersion = latest;
+    appUpdateAvailable = _newerThan(latest, appVersion);
+    notifyListeners();
+  }
+
+  /// Downloads the latest installer to %TEMP%, then launches it and quits.
+  Future<void> downloadAndInstallApp() async {
+    if (appUpdating) return;
+    appUpdateError = null;
+    appUpdating = true;
+    appUpdateProgress = 0.0;
+    notifyListeners();
+
+    final assetUrl = await _appUpdater.getReleaseAssetUrl();
+    if (assetUrl == null) {
+      appUpdateError = 'Could not find installer asset on GitHub.';
+      appUpdating = false;
+      notifyListeners();
+      return;
+    }
+
+    final savePath =
+        '${Directory.systemTemp.path}\\DownTubeInstaller.exe';
+    final ok = await _appUpdater.downloadInstaller(
+      assetUrl,
+      savePath,
+      onProgress: (received, total) {
+        appUpdateProgress = total > 0 ? received / total : 0.5;
+        notifyListeners();
+      },
+    );
+
+    if (!ok) {
+      appUpdateError = 'Download failed. Check your internet connection.';
+      appUpdating = false;
+      notifyListeners();
+      return;
+    }
+
+    // Launch the installer then quit this process
+    await Process.start(savePath, [], runInShell: false);
+    exit(0);
+  }
+
+  /// Semantic version comparison: true if [a] is strictly newer than [b].
+  static bool _newerThan(String a, String b) {
+    List<int> parse(String v) => v
+        .replaceAll(RegExp(r'[^\d.]'), '')
+        .split('.')
+        .map((s) => int.tryParse(s) ?? 0)
+        .toList();
+    final av = parse(a);
+    final bv = parse(b);
+    for (int i = 0; i < [av.length, bv.length].reduce((x, y) => x > y ? x : y); i++) {
+      final ai = i < av.length ? av[i] : 0;
+      final bi = i < bv.length ? bv[i] : 0;
+      if (ai > bi) return true;
+      if (ai < bi) return false;
+    }
+    return false;
+  }
 
   // User profile setters
   Future<void> setUserProfile({

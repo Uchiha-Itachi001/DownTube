@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "DownTube"
-#define MyAppVersion "1.0"
+#define MyAppVersion "2.7.1"
 #define MyAppPublisher "pankoj"
 #define MyAppExeName "youtube_downloder.exe"
 

@@ -11,6 +11,8 @@ class AppHeader extends StatefulWidget {
   final AnimationController? refreshSpinCtrl;
   final VoidCallback? onRefresh;
   final VoidCallback? onOpenDrawer;
+  /// Called when the user taps the "app update available" pill.
+  final VoidCallback? onAppUpdate;
 
   const AppHeader({
     super.key,
@@ -18,6 +20,7 @@ class AppHeader extends StatefulWidget {
     this.refreshSpinCtrl,
     this.onRefresh,
     this.onOpenDrawer,
+    this.onAppUpdate,
   });
 
   @override
@@ -115,6 +118,11 @@ class _AppHeaderState extends State<AppHeader> {
             const SizedBox(width: 12),
           ],
           _buildEnginePill(),
+          // App update badge — only shown when update is available
+          if (AppState.instance.appUpdateAvailable) ...[
+            const SizedBox(width: 8),
+            _buildAppUpdatePill(),
+          ],
           const Spacer(),
           _buildRefreshButton(),
           const SizedBox(width: 8),
@@ -210,6 +218,55 @@ class _AppHeaderState extends State<AppHeader> {
 
   Widget _buildIconButton(IconData icon, VoidCallback? onTap) {
     return _HamburgerButton(icon: icon, onTap: onTap);
+  }
+
+  Widget _buildAppUpdatePill() {
+    final latest = AppState.instance.latestAppVersion ?? '';
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onAppUpdate,
+        child: _PulsingWrapper(
+          active: true,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.10),
+              border: Border.all(color: Colors.orange.withOpacity(0.30)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _PulsingDot(color: Colors.orange),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'App Update',
+                      style: AppTextStyles.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    Text(
+                      'v$latest available',
+                      style: AppTextStyles.outfit(
+                        fontSize: 10,
+                        color: Colors.orange.withOpacity(0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildRefreshButton() {
@@ -666,13 +723,20 @@ class _DownloadHeaderBtnState extends State<_DownloadHeaderBtn> {
                                               ),
                                             ),
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            '$pct%',
-                                            style: AppTextStyles.outfit(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w700,
-                                              color: mainAccent,
+                                          Flexible(
+                                            flex: 0,
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(left: 4),
+                                              child: Text(
+                                                '$pct%',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.clip,
+                                                style: AppTextStyles.outfit(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: mainAccent,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                         ],

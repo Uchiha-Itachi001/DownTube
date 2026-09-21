@@ -13,6 +13,7 @@ import '../screens/library_screen.dart';
 import '../screens/history_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/developer_screen.dart';
+import '../widgets/app_update_dialog.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -31,6 +32,7 @@ class _AppShellState extends State<AppShell>
   bool _isRefreshing = false;
   late AnimationController _refreshSpinCtrl;
   bool _hasPromptedUpdate = false;
+  bool _hasPromptedAppUpdate = false;
 
   void _onNavSelected(int index) => setState(() => _selectedIndex = index);
 
@@ -82,11 +84,20 @@ class _AppShellState extends State<AppShell>
 
   void _checkUpdateAvailablePrompt() {
     final state = AppState.instance;
+    // yt-dlp engine update
     if (state.ytDlpReady && state.ytDlpUpdateAvailable && !_hasPromptedUpdate && !state.ytDlpUpdating) {
       _hasPromptedUpdate = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _showUpdateDialog(context);
+      });
+    }
+    // DownTube app self-update
+    if (state.appUpdateAvailable && !_hasPromptedAppUpdate && !state.appUpdating) {
+      _hasPromptedAppUpdate = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showAppUpdateDialog(context);
       });
     }
   }
@@ -222,6 +233,14 @@ class _AppShellState extends State<AppShell>
           ),
         ],
       ),
+    );
+  }
+
+  void _showAppUpdateDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AppUpdateDialog(),
     );
   }
 
@@ -362,6 +381,7 @@ class _AppShellState extends State<AppShell>
                             isRefreshing: _isRefreshing,
                             refreshSpinCtrl: _refreshSpinCtrl,
                             onRefresh: _onRefresh,
+                            onAppUpdate: () => _showAppUpdateDialog(context),
                             onOpenDrawer:
                                 isDrawer
                                     ? () =>

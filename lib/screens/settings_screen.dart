@@ -8,6 +8,7 @@ import '../providers/app_state.dart';
 import '../widgets/app_notification.dart';
 import '../widgets/toggle_switch.dart';
 import '../startup/splash_screen.dart';
+import '../core/app_version.dart';
 
 class SettingsScreen extends StatefulWidget {
   final VoidCallback? onReload;
@@ -1317,7 +1318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       Text(
-                        'v2.7.1 - Open Source Video Downloader',
+                        AppVersion.subtitle,
                         style: AppTextStyles.outfit(
                           fontSize: 11,
                           color: AppColors.muted,
